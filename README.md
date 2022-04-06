@@ -5,7 +5,7 @@
 
 ### Get Started
 0. Install latest Rust
-1. Rename _RocketExample.toml_
+1. Rename _RocketExample.toml_ to _Rocket.toml_
 2. Change field _jwt_secret_
 ```
 # Project Config
