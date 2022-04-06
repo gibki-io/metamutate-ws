@@ -1,0 +1,30 @@
+[default]
+address = "127.0.0.1"
+port = 8000
+workers = 16
+keep_alive = 5
+ident = "Rocket"
+log_level = "normal"
+temp_dir = "/tmp"
+cli_colors = true
+
+secret_key = "secretkey"
+
+# Project Config
+jwt_secret = "jwtsecret"
+
+[default.limits]
+forms = "64 kB"
+json = "1 MiB"
+msgpack = "2 MiB"
+"file/jpg" = "5 MiB"
+
+[default.tls]
+certs = "path/to/cert-chain.pem"
+key = "path/to/key.pem"
+
+[default.shutdown]
+ctrlc = true
+signals = ["term", "hup"]
+grace = 5
+mercy = 5
