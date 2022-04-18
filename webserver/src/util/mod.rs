@@ -31,13 +31,22 @@ pub struct AuthRequest<'a> {
     pub signature: &'a str,
 }
 
+#[derive(Deserialize)]
 pub struct TaskCreate<'a> {
     pub mint_address: &'a str,
-    pub current_rank: &'a str,
+    pub account: &'a str
 }
 
+#[derive(Deserialize)]
 pub struct PaymentCreate<'a> {
     pub task_id: &'a str,
+    pub account: &'a str
+}
+
+#[derive(Deserialize)]
+pub struct PaymentReceive<'a> {
+    pub payment_id: &'a str,
+    pub tx_id: &'a str
 }
 
 // Responses
@@ -68,4 +77,9 @@ pub fn create_jwt(pubkey: &str, secret: &str) -> Result<String> {
         &EncodingKey::from_secret(&secret.as_ref()),
     )?;
     Ok(token)
+}
+
+pub fn decode_jwt(token: &str, secret: &str) -> Result<()> {
+    decode::<Claims>(token, &DecodingKey::from_secret(&secret.as_ref()), &Validation::new(Algorithm::HS256))?;
+    Ok(())
 }

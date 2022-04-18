@@ -3,3 +3,5 @@ Rocket.toml
 *.db
 *.db-shm
 *.db-wal
+/keys/*
+/metadata/*

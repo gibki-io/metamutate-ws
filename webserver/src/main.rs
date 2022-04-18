@@ -10,18 +10,23 @@ use serde_json::json;
 use uuid::Uuid;
 
 mod util;
-use util::crypto;
-use util::{create_jwt, ApiKey, ApiKeyError, AuthRequest, Claims, SysResponse, WebResponse};
+use util::{
+    create_jwt, ApiKey, ApiKeyError, AuthRequest, Claims, PaymentCreate, SysResponse, TaskCreate,
+    WebResponse,
+};
+use util::{crypto, PaymentReceive};
 
 mod models;
-use models::{Database, WalletAccount};
+use models::{Database, Payment, Task, WalletAccount};
+
+mod handlers;
 
 #[macro_use]
 extern crate rocket;
 
 #[derive(Deserialize)]
-struct Config {
-    jwt_secret: String
+pub struct Config {
+    pub jwt_secret: String,
 }
 
 #[rocket::async_trait]
@@ -33,7 +38,10 @@ impl<'r> FromRequest<'r> for ApiKey<'r> {
         let config = req.rocket().state::<Config>().unwrap();
 
         fn is_valid(key: &str, secret: &str) -> bool {
-            true
+            match util::decode_jwt(key, secret) {
+                Ok(_) => true,
+                _ => false,
+            }
         }
 
         match req.headers().get_one("Authorization") {
@@ -46,29 +54,12 @@ impl<'r> FromRequest<'r> for ApiKey<'r> {
 
 #[get("/")]
 async fn index() -> &'static str {
-    "Hello, world!"
+    "System online"
 }
 
 #[post("/auth/<pubkey>")]
 async fn request_nonce(pubkey: &str, state: &State<Database>) -> WebResponse {
-    let nonce = Uuid::new_v4();
-
-    let account = WalletAccount {
-        pubkey: pubkey.to_string(),
-        nonce: nonce.to_string(),
-        created_at: rbatis::DateUtc::now(),
-    };
-
-    account
-        .save(&state.inner().db)
-        .await
-        .expect("Failed to save");
-
-    let data = json!({ "nonce": nonce });
-
-    let response = SysResponse { data };
-
-    (Status::Accepted, Json(response))
+    handlers::authkey_request(pubkey, state).await
 }
 
 #[post("/auth", data = "<auth_request>")]
@@ -77,83 +68,131 @@ async fn post_nonce(
     config: &State<Config>,
     db: &State<Database>,
 ) -> WebResponse {
-    let req = auth_request.into_inner();
-    // -- Fetch address-appropriate message from database
-    let db = &db.db;
-    let fetch_accounts = WalletAccount::lookup(&req.pubkey, db).await;
-    let account = if let Ok(Some(account)) = fetch_accounts {
-        account
-    } else {
-        let data = json!({ "error": "Pubkey has no auth key registered" });
-        let response = SysResponse { data };
-
-        return (Status::Forbidden, Json(response));
-    };
-    // <- Signature
-    match crypto::verify_message(&req, &account.nonce) {
-        Ok(_) => {
-            // -> Api Key
-            if let Ok(token) = create_jwt(&req.pubkey, &config.jwt_secret) {
-                let data = json!({ "token": token });
-                let response = SysResponse { data };
-
-                (Status::Accepted, Json(response))
-            } else {
-                let data = json!({ "error": "Error creating auth token" });
-                let response = SysResponse { data };
-
-                (Status::InternalServerError, Json(response))
-            }
-        }
-        Err(_e) => {
-            let data = json!({ "error": "Signature does not match pubkey" });
-            let response = SysResponse { data };
-
-            (Status::Forbidden, Json(response))
-        }
-    }
+    handlers::authkey_parse(auth_request, config, db).await
 }
 
 #[post("/tasks", data = "<task_request>")]
-async fn new_task(task_request: String, auth: ApiKey<'_>) {
-    // <- {mintAddress, currentRank}
-    // -> taskid
-    todo!()
+async fn new_task(
+    task_request: Json<TaskCreate<'_>>,
+    database: &State<Database>,
+    auth: ApiKey<'_>,
+) -> WebResponse {
+    handlers::create_task(task_request, database).await
 }
 
-#[post("/payments")]
-async fn new_payment(auth: ApiKey<'_>) {
-    todo!()
+#[post("/payments", data = "<payment_request>")]
+async fn new_payment(
+    payment_request: Json<PaymentCreate<'_>>,
+    database: &State<Database>,
+    auth: ApiKey<'_>,
+) -> WebResponse {
+    handlers::create_payment(payment_request, database).await
 }
 
-#[get("/tasks/<taskid>")]
-async fn get_task(taskid: &str, auth: ApiKey<'_>) {
-    todo!()
+#[get("/tasks/<task_id>")]
+async fn get_task(task_id: &str, database: &State<Database>, auth: ApiKey<'_>) -> WebResponse {
+    let db = &database.db;
+    let fetch = Task::fetch_one_by_id(task_id, db).await;
+
+    let query = match fetch {
+        Ok(task) => task,
+        Err(_) => {
+            let data = json!({ "error": "Failed to query tasks" });
+            let response = SysResponse { data };
+
+            return (Status::BadRequest, Json(response));
+        }
+    };
+
+    let task = match query {
+        Some(task) => task,
+        None => {
+            let data = json!({ "error": "Not found" });
+            let response = SysResponse { data };
+
+            return (Status::NotFound, Json(response));
+        }
+    };
+
+    let data = json!({ "task": task });
+    let response = SysResponse { data };
+
+    return (Status::BadRequest, Json(response));
 }
 
-#[get("/payments/<paymentid>")]
-async fn get_payment(paymentid: &str, auth: ApiKey<'_>) {
-    todo!()
+#[get("/tasks/<account>")]
+async fn list_tasks(account: &str, database: &State<Database>, auth: ApiKey<'_>) -> WebResponse {
+    let db = &database.db;
+    let fetch = Task::fetch_by_account(account, db).await;
+
+    let tasks = match fetch {
+        Ok(tasks) => tasks,
+        Err(_) => {
+            let data = json!({ "error": "Failed to fetch tasks" });
+            let response = SysResponse { data };
+
+            return (Status::BadRequest, Json(response));
+        }
+    };
+    let data = json!({ "tasks": tasks });
+    let response = SysResponse { data };
+
+    return (Status::BadRequest, Json(response));
 }
+
+#[get("/payments/<payment_id>")]
+async fn get_payment(payment_id: &str, database: &State<Database>, auth: ApiKey<'_>) -> WebResponse {
+    let db = &database.db;
+    let fetch = Payment::fetch_one_by_id(payment_id, db).await;
+
+    let query = match fetch {
+        Ok(query) => query,
+        Err(_) => {
+            let data = json!({ "error": "Failed to query payment" });
+            let response = SysResponse { data };
+
+            return (Status::BadRequest, Json(response));
+        }
+    };
+
+    let payment = match query {
+        Some(payment) => payment,
+        None => {
+            let data = json!({ "error": "Payment does not exist" });
+            let response = SysResponse { data };
+
+            return (Status::BadRequest, Json(response));
+        }
+    };
+
+    let data = json!({ "payment": payment });
+    let response = SysResponse { data };
+
+    return (Status::BadRequest, Json(response));
+}
+
+#[post("/payments/hook", data = "<payment_receive>")]
+async fn receive_payment(
+    payment_receive: Json<PaymentReceive<'_>>,
+    database: &State<Database>,
+    auth: ApiKey<'_>,
+) -> WebResponse {
+    handlers::receive_payment(payment_receive, database).await
+}
+
 #[launch]
 async fn rocket() -> _ {
     let server = rocket::build();
     let figment = server.figment();
 
     let _config: Config = figment.extract().expect("Config file not present");
-    let _rb = Rbatis::new();
     let _f = std::fs::File::create("database.db").unwrap();
     let rb = Rbatis::new();
 
-    rb.link("sqlite://database.db")
-        .await
-        .expect("Failed to connect to DB");
-    rb.exec("CREATE TABLE IF NOT EXISTS accounts(pubkey VARCHAR(60), nonce VARCHAR(60), created_at DATE, PRIMARY KEY(pubkey))", vec![])
-        .await
-        .expect("Failed to create table");
+    Database::migrate(&rb).await;
 
     server
-        .mount("/", routes![index, request_nonce, post_nonce])
+        .mount("/", routes![index, request_nonce, post_nonce, new_task, new_payment, get_task, list_tasks, get_payment, receive_payment])
         .attach(AdHoc::config::<Config>())
         .manage(Database { db: rb })
 }
