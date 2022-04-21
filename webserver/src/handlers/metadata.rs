@@ -22,7 +22,7 @@ use std::io::BufReader;
 const VERIFIED_CREATOR: &str = "Bf2jdfoFrqVS2n6eDtzzmb8cbue7B1ibcZF4QCvruqav";
 
 pub async fn handle_update<'a> (mint_account: &'a str) -> Result<(), WebResponse>{
-    let rpc: RpcClient = RpcClient::new("url");
+    let rpc: RpcClient = RpcClient::new("https://solport.genesysgo.net/");
 
     let metadata = match verify_metadata(&rpc, mint_account) {
         Ok(metadata) => metadata,

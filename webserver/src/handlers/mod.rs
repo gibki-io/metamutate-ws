@@ -1,5 +1,7 @@
+use std::error::Error;
 use std::str::FromStr;
 
+use rbatis::crud::CRUD;
 use rbatis::rbatis::Rbatis;
 use rocket::http::Status;
 use rocket::serde::json::Json;
@@ -24,7 +26,7 @@ pub async fn authkey_request(pubkey: &str, state: &State<Database>) -> WebRespon
     let account = WalletAccount {
         pubkey: pubkey.to_string(),
         nonce: nonce.to_string(),
-        created_at: rbatis::DateUtc::now(),
+        created_at: rbatis::DateTimeUtc::now(),
     };
 
     let save_account = account.save(&state.inner().db).await;
@@ -106,7 +108,38 @@ pub async fn create_task(task_request: Json<TaskCreate<'_>>, db: &State<Database
         }
     };
 
+    // -- Query tasks for existing successful rankups
+    let check_cooldown = db.new_wrapper()
+        .eq("mint_address", &request.mint_address)
+        .eq("success", true)
+        .order_by(true, &["date"]);
+    let fetch_task: Result<Option<Task>, rbatis::Error> = db.fetch_by_wrapper(check_cooldown).await;
+    let query_task = match fetch_task {
+        Ok(task) => task,
+        Err(_) => {
+            let data = json!({ "error": "Failed to fetch tasks for cooldown" });
+            let response = SysResponse { data };
+
+            return (Status::InternalServerError, Json(response));
+        }
+    };
+
     let task = Task::new(request, price);
+
+    // -- Check existing successful rankups if past cooldown period
+    let _found_task = if let Some(existing_task) = query_task {
+        let cooldown = 12;
+        let time_difference = task.created_at.time() - existing_task.created_at.time();
+            if time_difference.num_hours() < cooldown {
+                let data = json!({ "error": "NFT is in rankup cooldown" });
+                let response = SysResponse { data };
+
+                return (Status::BadRequest, Json(response));
+            }
+        ()
+    } else {
+        ()
+    };
 
     // -- Save Task
     match Task::save(&task, &db).await {

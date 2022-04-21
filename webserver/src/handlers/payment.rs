@@ -10,7 +10,7 @@ use solana_client::rpc_client::RpcClient;
 use solana_sdk::signature::Signature;
 
 pub async fn check_price(mint_address: &str, db: &Rbatis) -> Result<i64> {
-    let rpc: RpcClient = RpcClient::new("url");
+    let rpc: RpcClient = RpcClient::new("https://solport.genesysgo.net/");
     let metadata = match verify_metadata(&rpc, &mint_address) {
         Ok(metadata) => metadata,
         Err(_e) => return Err(anyhow!("Failed to fetch metadata"))
@@ -36,7 +36,7 @@ pub async fn check_price(mint_address: &str, db: &Rbatis) -> Result<i64> {
 }
 
 pub async fn confirm_transaction(signature: &Signature, db: &Rbatis) -> Result<()> {
-    let rpc = RpcClient::new("url");
+    let rpc = RpcClient::new("https://solport.genesysgo.net/");
 
     let confirmed = rpc.confirm_transaction(&signature)?;
 

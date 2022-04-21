@@ -14,7 +14,7 @@ pub mod metadata;
 pub struct WalletAccount {
     pub pubkey: String,
     pub nonce: String,
-    pub created_at: rbatis::DateUtc,
+    pub created_at: rbatis::DateTimeUtc,
 }
 
 #[crud_table(table_name:tasks)]
@@ -22,7 +22,7 @@ pub struct WalletAccount {
 pub struct Task {
     pub id: rbatis::Uuid,
     pub account: String,
-    pub created_at: rbatis::DateUtc,
+    pub created_at: rbatis::DateTimeUtc,
     pub mint_address: String,
     pub price: i64,
     pub success: bool
@@ -32,7 +32,7 @@ pub struct Task {
 pub struct Payment {
     pub id: rbatis::Uuid,
     pub account: String,
-    pub created_at: rbatis::DateUtc,
+    pub created_at: rbatis::DateTimeUtc,
     pub task_id: String,
     pub amount: i64,
     pub success: bool,
@@ -65,7 +65,7 @@ impl Payment {
         let new_payment = Payment {
             id: rbatis::Uuid::new(),
             account: request.account.to_string(),
-            created_at: rbatis::DateUtc::now(),
+            created_at: rbatis::DateTimeUtc::now(),
             success: false,
             task_id: request.task_id.to_string(),
             amount: price,
@@ -110,7 +110,7 @@ impl Task {
             id: rbatis::Uuid::new(),
             account: request.account.to_string(),
             mint_address: request.mint_address.to_string(),
-            created_at: rbatis::DateUtc::now(),
+            created_at: rbatis::DateTimeUtc::now(),
             success: false,
             price,
         };
