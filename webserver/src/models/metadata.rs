@@ -1,7 +1,6 @@
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-pub struct MetadataRoot {
+pub struct _MetadataRoot {
     pub root: MetadataInner
 }
 

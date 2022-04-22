@@ -2,9 +2,7 @@ use rbatis::crud::CRUD;
 use rbatis::crud_table;
 use rbatis::rbatis::Rbatis;
 
-use std::collections::HashMap;
-
-use anyhow::{anyhow, Result};
+use anyhow::{Result};
 use serde::{Deserialize, Serialize};
 
 pub mod metadata;
@@ -44,7 +42,7 @@ pub struct Database {
 }
 
 impl Database {
-    pub async fn migrate(rb: &Rbatis) -> () {
+    pub async fn migrate(rb: &Rbatis) {
         rb.link("sqlite://database.db")
             .await
             .expect("Failed to connect to DB");
@@ -62,7 +60,7 @@ impl Database {
 
 impl Payment {
     pub fn new(request: crate::util::PaymentCreate<'_>, price: i64) -> Payment {
-        let new_payment = Payment {
+        Payment {
             id: rbatis::Uuid::new(),
             account: request.account.to_string(),
             created_at: rbatis::DateTimeUtc::now(),
@@ -70,9 +68,7 @@ impl Payment {
             task_id: request.task_id.to_string(),
             amount: price,
             tx: "".to_string()
-        };
-
-        new_payment
+        }
     }
 
     pub async fn save(&self, db: &Rbatis) -> Result<()> {
@@ -89,7 +85,7 @@ impl Payment {
         Ok(result)
     }
 
-    pub async fn fetch_by_account(account: &str, db: &Rbatis) -> Result<Vec<Payment>> {
+    pub async fn _fetch_by_account(account: &str, db: &Rbatis) -> Result<Vec<Payment>> {
         let result: Vec<Payment> = db
             .fetch_list_by_column("account", &[account.to_string()])
             .await?;
@@ -106,16 +102,14 @@ impl Payment {
 
 impl Task {
     pub fn new(request: crate::util::TaskCreate<'_>, price: i64) -> Task {
-        let new_task = Task {
+        Task {
             id: rbatis::Uuid::new(),
             account: request.account.to_string(),
             mint_address: request.mint_address.to_string(),
             created_at: rbatis::DateTimeUtc::now(),
             success: false,
             price,
-        };
-
-        new_task
+        }
     }
 
     pub async fn save(&self, db: &Rbatis) -> Result<()> {
@@ -124,7 +118,7 @@ impl Task {
         Ok(())
     }
 
-    pub async fn fetch_one_by_address(&self, db: &Rbatis) -> Result<Option<Task>> {
+    pub async fn _fetch_one_by_address(&self, db: &Rbatis) -> Result<Option<Task>> {
         let result: Option<Task> = db
             .fetch_by_column("mint_address", &self.mint_address)
             .await?;
@@ -154,7 +148,7 @@ impl Task {
         Ok(())
     }
 
-    pub async fn delete_task(&self, db: &Rbatis) -> Result<()> {
+    pub async fn _delete_task(&self, db: &Rbatis) -> Result<()> {
         let _result = db
             .remove_by_column::<Task, _>("id", &self.id)
             .await?;

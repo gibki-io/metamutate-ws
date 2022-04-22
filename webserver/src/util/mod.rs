@@ -74,12 +74,12 @@ pub fn create_jwt(pubkey: &str, secret: &str) -> Result<String> {
     let token = encode(
         &Header::default(),
         &claims,
-        &EncodingKey::from_secret(&secret.as_ref()),
+        &EncodingKey::from_secret(secret.as_ref()),
     )?;
     Ok(token)
 }
 
 pub fn decode_jwt(token: &str, secret: &str) -> Result<()> {
-    decode::<Claims>(token, &DecodingKey::from_secret(&secret.as_ref()), &Validation::new(Algorithm::HS256))?;
+    decode::<Claims>(token, &DecodingKey::from_secret(secret.as_ref()), &Validation::new(Algorithm::HS256))?;
     Ok(())
 }

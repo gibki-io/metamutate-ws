@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::str::FromStr;
 
 use rbatis::crud::CRUD;
@@ -56,7 +55,7 @@ pub async fn authkey_parse(
 
     // -- Fetch address-appropriate message from database
     let db: &Rbatis = &db.db;
-    let fetch_accounts = WalletAccount::fetch(&req.pubkey, db).await;
+    let fetch_accounts = WalletAccount::fetch(req.pubkey, db).await;
 
     let account = if let Ok(Some(account)) = fetch_accounts {
         account
@@ -71,7 +70,7 @@ pub async fn authkey_parse(
     match crypto::verify_message(&req, &account.nonce) {
         Ok(_) => {
             // -> Api Key
-            if let Ok(token) = create_jwt(&req.pubkey, &config.jwt_secret) {
+            if let Ok(token) = create_jwt(req.pubkey, &config.jwt_secret) {
                 let data = json!({ "token": token });
                 let response = SysResponse { data };
 
@@ -98,7 +97,7 @@ pub async fn create_task(task_request: Json<TaskCreate<'_>>, db: &State<Database
     let db = &db.db;
 
     // -- Calculate price
-    let price: i64 = match crate::handlers::payment::check_price(request.mint_address, &db).await {
+    let price: i64 = match crate::handlers::payment::check_price(request.mint_address, db).await {
         Ok(price) => price,
         Err(_) => {
             let data = json!({ "error": "Failed to calculate price" });
@@ -136,13 +135,10 @@ pub async fn create_task(task_request: Json<TaskCreate<'_>>, db: &State<Database
 
                 return (Status::BadRequest, Json(response));
             }
-        ()
-    } else {
-        ()
     };
 
     // -- Save Task
-    match Task::save(&task, &db).await {
+    match Task::save(&task, db).await {
         Ok(_) => (),
         Err(_e) => {
             let data = json!({ "error": "Failed to save task to database" });
@@ -166,7 +162,7 @@ pub async fn create_payment(
     let request = payment_request.into_inner();
     let db = &db.db;
     let task = {
-        let fetch_task = match Task::fetch_one_by_id(request.task_id, &db).await {
+        let fetch_task = match Task::fetch_one_by_id(request.task_id, db).await {
             Ok(fetch) => fetch,
             Err(_) => {
                 let data = json!({ "error": "Database query failed" });
@@ -176,7 +172,7 @@ pub async fn create_payment(
             }
         };
 
-        let exists = match fetch_task {
+        match fetch_task {
             Some(task) => task,
             None => {
                 let data = json!({ "error": "Task does not exist" });
@@ -184,14 +180,12 @@ pub async fn create_payment(
 
                 return (Status::NotFound, Json(response));
             }
-        };
-
-        exists
+        }
     };
 
     let new_payment = Payment::new(request, task.price);
 
-    match new_payment.save(&db).await {
+    match new_payment.save(db).await {
         Ok(_) => (),
         Err(_) => {
             let data = json!({ "error": "Failed to save payment to database" });
@@ -205,7 +199,7 @@ pub async fn create_payment(
     let data = json!({ "payment_id": new_payment.id });
     let response = SysResponse { data };
 
-    return (Status::Created, Json(response))
+    (Status::Created, Json(response))
 }
 
 pub async fn receive_payment(
@@ -216,7 +210,7 @@ pub async fn receive_payment(
     let db = &db.db;
 
     let mut payment = {
-        let fetch_payment = match Payment::fetch_one_by_id(request.payment_id, &db).await {
+        let fetch_payment = match Payment::fetch_one_by_id(request.payment_id, db).await {
             Ok(found) => found,
             Err(_) => {
                 let data = json!({ "error": "Failed to fetch payment" });
@@ -226,7 +220,7 @@ pub async fn receive_payment(
             }
         };
 
-        let exists = match fetch_payment {
+        match fetch_payment {
             Some(payment) => payment,
             None => {
                 let data = json!({ "error": "Payment does not exist" });
@@ -234,9 +228,7 @@ pub async fn receive_payment(
 
                 return (Status::NotFound, Json(response));
             }
-        };
-
-        exists
+        }
     };
 
     // Verify Transaction Signature
@@ -250,7 +242,7 @@ pub async fn receive_payment(
         }
     };
 
-    let _confirm_result = match crate::handlers::payment::confirm_transaction(&signature, &db).await {
+    let _confirm_result = match crate::handlers::payment::confirm_transaction(&signature, db).await {
         Ok(_) => (),
         Err(_) => {
             let data = json!({ "error": "Invalid signature" });
@@ -262,7 +254,7 @@ pub async fn receive_payment(
 
     // Set Payment to Success
     payment.success = true;
-    let _confirm_payment = match payment.confirm_payment(&db).await {
+    let _confirm_payment = match payment.confirm_payment(db).await {
         Ok(_) => (),
         Err(_) => {
             let data = json!({ "error": "Failed to update payment" });
@@ -273,7 +265,7 @@ pub async fn receive_payment(
     };
 
     let mut task = {
-        let fetch_task = match Task::fetch_one_by_id(&payment.task_id, &db).await {
+        let fetch_task = match Task::fetch_one_by_id(&payment.task_id, db).await {
             Ok(fetch) => fetch,
             Err(_) => {
                 let data = json!({ "error": "Database query failed" });
@@ -283,7 +275,7 @@ pub async fn receive_payment(
             }
         };
 
-        let exists = match fetch_task {
+        match fetch_task {
             Some(task) => task,
             None => {
                 let data = json!({ "error": "Task does not exist" });
@@ -291,20 +283,16 @@ pub async fn receive_payment(
 
                 return (Status::NotFound, Json(response));
             }
-        };
-
-        exists
+        }
     };
 
     let _update_metadata = match handle_update(&task.mint_address).await {
-        Ok(_) => {
-            ()
-        },
+        Ok(_) => {},
         Err(e) => return e
     };
 
     task.success = true;
-    let _update_task = match task.update_task(&db).await {
+    let _update_task = match task.update_task(db).await {
         Ok(_) => (),
         Err(_) => {
             let data = json!({ "error": "Failed to update task" });
@@ -317,5 +305,5 @@ pub async fn receive_payment(
     let data = json!({ "error": "Task does not exist" });
     let response = SysResponse { data };
 
-    return (Status::NotFound, Json(response));
+    (Status::NotFound, Json(response))
 }

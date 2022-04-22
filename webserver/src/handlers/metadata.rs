@@ -1,27 +1,24 @@
 use crate::{
     models::{
         metadata::{MetadataAttribute, MetadataInner},
-        Database,
     },
-    util::{SysResponse, TaskCreate, WebResponse},
+    util::{SysResponse, WebResponse},
 };
 use anyhow::{anyhow, Result as AnyResult};
 use mpl_token_metadata::state::Metadata;
 use rand::Rng;
 use reqwest::blocking::multipart;
 use rocket::serde::json::Json;
-use rocket::{http::Status, State};
+use rocket::{http::Status};
 use serde_json::{json, value::to_value, Value};
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::signature::Keypair;
 use std::fs::File;
 use metaboss::update_metadata::update_uri;
-use std::io::prelude::*;
-use std::io::BufReader;
 
 const VERIFIED_CREATOR: &str = "Bf2jdfoFrqVS2n6eDtzzmb8cbue7B1ibcZF4QCvruqav";
 
-pub async fn handle_update<'a> (mint_account: &'a str) -> Result<(), WebResponse>{
+pub async fn handle_update(mint_account: &'_ str) -> Result<(), WebResponse>{
     let rpc: RpcClient = RpcClient::new("https://solport.genesysgo.net/");
 
     let metadata = match verify_metadata(&rpc, mint_account) {
@@ -79,7 +76,7 @@ pub async fn handle_update<'a> (mint_account: &'a str) -> Result<(), WebResponse
 
     let _status = match ipfs["ok"].as_bool() {
         Some(ok) => {
-            if ok == false {
+            if !ok {
                 let data = json!({ "error": "Failed to upload to IPFS" });
                 let response = SysResponse { data };
 
@@ -143,10 +140,10 @@ pub async fn handle_update<'a> (mint_account: &'a str) -> Result<(), WebResponse
 }
 
 pub fn verify_metadata(rpc: &RpcClient, mint_account: &str) -> AnyResult<Metadata> {
-    let metadata = metaboss::decode::decode(&rpc, mint_account)?;
+    let metadata = metaboss::decode::decode(rpc, mint_account)?;
     let creators = metadata.data.creators.as_ref().unwrap();
 
-    if creators[0].address.to_string() != VERIFIED_CREATOR.to_string()
+    if creators[0].address.to_string() != *VERIFIED_CREATOR
     {
         return Err(anyhow!("Not the right collection"));
     }
@@ -155,9 +152,9 @@ pub fn verify_metadata(rpc: &RpcClient, mint_account: &str) -> AnyResult<Metadat
 }
 
 pub fn get_rank_attribute(attributes: Vec<MetadataAttribute>) -> AnyResult<MetadataAttribute> {
-    let mut rank_attribute = if let Some(rank) = attributes
+    let mut _rank_attribute = if let Some(rank) = attributes
         .into_iter()
-        .find(|rank| rank.trait_type == "Rank".to_string())
+        .find(|rank| rank.trait_type == *"Rank")
     {
         return Ok(rank);
     } else {
@@ -216,7 +213,7 @@ pub async fn save_metadata(inner_metadata: MetadataInner, mint_account: &str) ->
     Ok(())
 }
 
-pub fn upload_to_ipfs<'a> (mint_account: &'a str) -> AnyResult<Value> {
+pub fn upload_to_ipfs(mint_account: &'_ str) -> AnyResult<Value> {
     let address = mint_account;
     let form = multipart::Form::new()
         .file(format!("{}.json", address), format!("./metadata/{}.json", address))?;

@@ -3,21 +3,20 @@ use rocket::{
     fairing::AdHoc,
     http::Status,
     request::{FromRequest, Outcome, Request},
-    serde::{json::Json, Deserialize, Serialize},
+    serde::{json::Json, Deserialize},
     State,
 };
 use serde_json::json;
-use uuid::Uuid;
 
 mod util;
 use util::{
-    create_jwt, ApiKey, ApiKeyError, AuthRequest, Claims, PaymentCreate, SysResponse, TaskCreate,
+    ApiKey, ApiKeyError, AuthRequest, PaymentCreate, SysResponse, TaskCreate,
     WebResponse,
 };
-use util::{crypto, PaymentReceive};
+use util::{PaymentReceive};
 
 mod models;
-use models::{Database, Payment, Task, WalletAccount};
+use models::{Database, Payment, Task};
 
 mod handlers;
 
@@ -38,10 +37,7 @@ impl<'r> FromRequest<'r> for ApiKey<'r> {
         let config = req.rocket().state::<Config>().unwrap();
 
         fn is_valid(key: &str, secret: &str) -> bool {
-            match util::decode_jwt(key, secret) {
-                Ok(_) => true,
-                _ => false,
-            }
+            matches!(util::decode_jwt(key, secret), Ok(_))
         }
 
         match req.headers().get_one("Authorization") {
@@ -75,7 +71,7 @@ async fn post_nonce(
 async fn new_task(
     task_request: Json<TaskCreate<'_>>,
     database: &State<Database>,
-    auth: ApiKey<'_>,
+    _auth: ApiKey<'_>,
 ) -> WebResponse {
     handlers::create_task(task_request, database).await
 }
@@ -84,13 +80,13 @@ async fn new_task(
 async fn new_payment(
     payment_request: Json<PaymentCreate<'_>>,
     database: &State<Database>,
-    auth: ApiKey<'_>,
+    _auth: ApiKey<'_>,
 ) -> WebResponse {
     handlers::create_payment(payment_request, database).await
 }
 
 #[get("/tasks/<task_id>")]
-async fn get_task(task_id: &str, database: &State<Database>, auth: ApiKey<'_>) -> WebResponse {
+async fn get_task(task_id: &str, database: &State<Database>, _auth: ApiKey<'_>) -> WebResponse {
     let db = &database.db;
     let fetch = Task::fetch_one_by_id(task_id, db).await;
 
@@ -117,11 +113,11 @@ async fn get_task(task_id: &str, database: &State<Database>, auth: ApiKey<'_>) -
     let data = json!({ "task": task });
     let response = SysResponse { data };
 
-    return (Status::BadRequest, Json(response));
+    (Status::BadRequest, Json(response))
 }
 
 #[get("/tasks/<account>")]
-async fn list_tasks(account: &str, database: &State<Database>, auth: ApiKey<'_>) -> WebResponse {
+async fn list_tasks(account: &str, database: &State<Database>, _auth: ApiKey<'_>) -> WebResponse {
     let db = &database.db;
     let fetch = Task::fetch_by_account(account, db).await;
 
@@ -137,11 +133,11 @@ async fn list_tasks(account: &str, database: &State<Database>, auth: ApiKey<'_>)
     let data = json!({ "tasks": tasks });
     let response = SysResponse { data };
 
-    return (Status::BadRequest, Json(response));
+    (Status::BadRequest, Json(response))
 }
 
 #[get("/payments/<payment_id>")]
-async fn get_payment(payment_id: &str, database: &State<Database>, auth: ApiKey<'_>) -> WebResponse {
+async fn get_payment(payment_id: &str, database: &State<Database>, _auth: ApiKey<'_>) -> WebResponse {
     let db = &database.db;
     let fetch = Payment::fetch_one_by_id(payment_id, db).await;
 
@@ -168,14 +164,14 @@ async fn get_payment(payment_id: &str, database: &State<Database>, auth: ApiKey<
     let data = json!({ "payment": payment });
     let response = SysResponse { data };
 
-    return (Status::BadRequest, Json(response));
+    (Status::BadRequest, Json(response))
 }
 
 #[post("/payments/hook", data = "<payment_receive>")]
 async fn receive_payment(
     payment_receive: Json<PaymentReceive<'_>>,
     database: &State<Database>,
-    auth: ApiKey<'_>,
+    _auth: ApiKey<'_>,
 ) -> WebResponse {
     handlers::receive_payment(payment_receive, database).await
 }
