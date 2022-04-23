@@ -30,6 +30,30 @@ use sea_orm_rocket::{Connection, Database};
 use sea_orm::ActiveValue::NotSet;
 use sea_orm::entity::prelude::Uuid;
 
+
+use rocket::http::Header;
+use rocket::{Response};
+use rocket::fairing::{Fairing, Info, Kind};
+
+pub struct CORS;
+
+#[rocket::async_trait]
+impl Fairing for CORS {
+    fn info(&self) -> Info {
+        Info {
+            name: "Add CORS headers to responses",
+            kind: Kind::Response
+        }
+    }
+
+    async fn on_response<'r>(&self, _request: &'r Request<'_>, response: &mut Response<'r>) {
+        response.set_header(Header::new("Access-Control-Allow-Origin", "*"));
+        response.set_header(Header::new("Access-Control-Allow-Methods", "POST, GET, PATCH, OPTIONS"));
+        response.set_header(Header::new("Access-Control-Allow-Headers", "*"));
+        response.set_header(Header::new("Access-Control-Allow-Credentials", "true"));
+    }
+}
+
 mod models;
 mod handlers;
 
@@ -73,28 +97,52 @@ async fn index() -> &'static str {
 async fn request_nonce(pubkey: &str, connection: Connection<'_, Db>) -> WebResponse {
     let db = connection.into_inner();
 
-    let nonce = Uuid::new_v4().to_string();
+    let fetch_account = Accounts::find()
+        .filter(entity::accounts::Column::Pubkey.contains(pubkey))
+        .one(db)
+        .await;
 
-    let account = entity::accounts::ActiveModel {
-        id: NotSet,
-        pubkey: Set(pubkey.to_string()),
-        nonce: Set(nonce.clone()),
-        created_at: Set(Utc::now().naive_utc())
-    };
-
-    let save_account = account.save(db).await;
-
-    match save_account {
-        Ok(_) => (),
-        Err(_e) => {
+    let account_query = match fetch_account {
+        Ok(result) => result,
+        Err(_) => {
             let data = json!({ "error": "Failed to save pubkey into database" });
             let response = SysResponse { data };
 
             return (Status::Accepted, Json(response));
         }
-    }
+    };
+
+    let account = if let Some(account) = account_query {
+        let found_account: entity::accounts::ActiveModel = account.into();
+
+        found_account
+    } else {
+        let nonce = Uuid::new_v4().to_string();
+        let account = entity::accounts::ActiveModel {
+            id: NotSet,
+            pubkey: Set(pubkey.to_string()),
+            nonce: Set(nonce.clone()),
+            created_at: Set(Utc::now().naive_utc())
+        };
+
+        let account_copy = account.clone();
+
+        let save_account = account.save(db).await;
+
+        match save_account {
+            Ok(_) => (),
+            Err(_e) => {
+                let data = json!({ "error": "Failed to save pubkey into database" });
+                let response = SysResponse { data };
+
+                return (Status::Accepted, Json(response));
+            }
+        };
+
+        account_copy
+    };
     
-    let data = json!({ "nonce": nonce });
+    let data = json!({ "nonce": account.nonce.as_ref() });
     let response = SysResponse { data };
 
     (Status::Accepted, Json(response))
@@ -140,8 +188,8 @@ async fn post_nonce(
                 (Status::InternalServerError, Json(response))
             }
         }
-        Err(_e) => {
-            let data = json!({ "error": "Signature does not match pubkey" });
+        Err(e) => {
+            let data = json!({ "error": e.to_string() });
             let response = SysResponse { data };
 
             (Status::Forbidden, Json(response))
@@ -521,4 +569,5 @@ async fn rocket() -> _ {
         .attach(AdHoc::try_on_ignite("Migrations", run_migrations))
         .attach(AdHoc::config::<Config>())
         .mount("/api", routes![index, request_nonce, post_nonce, new_task, new_payment, get_task, list_tasks, get_payment, receive_payment])
+        .attach(CORS)
 }

@@ -5696,6 +5696,7 @@ name = "webserver"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bs58 0.4.0",
  "chrono",
  "ed25519-dalek",
  "entity",
