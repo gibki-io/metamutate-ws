@@ -197,6 +197,9 @@ async fn post_nonce(
     }
 }
 
+#[options("/tasks")]
+async fn options_task() {}
+
 #[post("/tasks", data = "<task_request>")]
 async fn new_task(
     task_request: Json<TaskCreate<'_>>,
@@ -276,6 +279,9 @@ async fn new_task(
     (Status::Created, Json(response))
 }
 
+#[options("/payments")]
+async fn options_payments() {}
+
 #[post("/payments", data = "<payment_request>")]
 async fn new_payment(
     payment_request: Json<PaymentCreate<'_>>,
@@ -340,6 +346,9 @@ async fn new_payment(
     (Status::Created, Json(response))
 }
 
+#[options("/tasks/id/<task_id>")]
+async fn options_task_2(task_id: &str) {}
+
 #[get("/tasks/id/<task_id>")]
 async fn get_task(task_id: &str, connection: Connection<'_, Db>, _auth: ApiKey<'_>) -> WebResponse {
     let db = connection.into_inner();
@@ -374,6 +383,9 @@ async fn get_task(task_id: &str, connection: Connection<'_, Db>, _auth: ApiKey<'
     (Status::BadRequest, Json(response))
 }
 
+#[options("/tasks/accounts/<account>")]
+async fn options_task_3(account: &str) {}
+
 #[get("/tasks/account/<account>")]
 async fn list_tasks(account: &str, connection: Connection<'_, Db>, _auth: ApiKey<'_>) -> WebResponse {
     let db = connection.into_inner();
@@ -396,6 +408,9 @@ async fn list_tasks(account: &str, connection: Connection<'_, Db>, _auth: ApiKey
 
     (Status::BadRequest, Json(response))
 }
+
+#[options("/payments/id/<payment>")]
+async fn options_payments_2(payment: &str) {}
 
 #[get("/payments/id/<payment_id>")]
 async fn get_payment(payment_id: &str, connection: Connection<'_, Db>, _auth: ApiKey<'_>) -> WebResponse {
@@ -568,6 +583,6 @@ async fn rocket() -> _ {
         .attach(Db::init())
         .attach(AdHoc::try_on_ignite("Migrations", run_migrations))
         .attach(AdHoc::config::<Config>())
-        .mount("/api", routes![index, request_nonce, post_nonce, new_task, new_payment, get_task, list_tasks, get_payment, receive_payment])
+        .mount("/api", routes![index, request_nonce, post_nonce, new_task, new_payment, get_task, list_tasks, get_payment, receive_payment, options_task, options_task_2, options_task_3, options_payments, options_payments_2])
         .attach(CORS)
 }
