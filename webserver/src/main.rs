@@ -1,39 +1,37 @@
 use std::str::FromStr;
 
-use chrono::{Utc};
+use chrono::Utc;
 use handlers::metadata::handle_update;
 use migration::MigratorTrait;
 use rocket::{
-    fairing::{AdHoc, self},
+    fairing::{self, AdHoc},
     http::Status,
     request::{FromRequest, Outcome, Request},
     serde::{json::Json, Deserialize},
-    State, Rocket, Build,
+    Build, Rocket, State,
 };
 use serde_json::json;
 
-
 mod util;
+use util::PaymentReceive;
 use util::{
-    ApiKey, ApiKeyError, AuthRequest, PaymentCreate, SysResponse, TaskCreate,
-    WebResponse, crypto, create_jwt,
+    create_jwt, crypto, ApiKey, ApiKeyError, AuthRequest, PaymentCreate, SysResponse, TaskCreate,
+    WebResponse,
 };
-use util::{PaymentReceive};
 
-pub use entity::prelude::*;
 use entity::accounts::Entity as Accounts;
 use entity::payments::Entity as Payments;
+pub use entity::prelude::*;
 use entity::tasks::Entity as Tasks;
 
+use sea_orm::entity::prelude::Uuid;
+use sea_orm::ActiveValue::NotSet;
 use sea_orm::{entity::*, query::*};
 use sea_orm_rocket::{Connection, Database};
-use sea_orm::ActiveValue::NotSet;
-use sea_orm::entity::prelude::Uuid;
 
-
-use rocket::http::Header;
-use rocket::{Response};
 use rocket::fairing::{Fairing, Info, Kind};
+use rocket::http::Header;
+use rocket::Response;
 
 pub struct CORS;
 
@@ -42,20 +40,23 @@ impl Fairing for CORS {
     fn info(&self) -> Info {
         Info {
             name: "Add CORS headers to responses",
-            kind: Kind::Response
+            kind: Kind::Response,
         }
     }
 
     async fn on_response<'r>(&self, _request: &'r Request<'_>, response: &mut Response<'r>) {
         response.set_header(Header::new("Access-Control-Allow-Origin", "*"));
-        response.set_header(Header::new("Access-Control-Allow-Methods", "POST, GET, PATCH, OPTIONS"));
+        response.set_header(Header::new(
+            "Access-Control-Allow-Methods",
+            "POST, GET, PATCH, OPTIONS",
+        ));
         response.set_header(Header::new("Access-Control-Allow-Headers", "*"));
         response.set_header(Header::new("Access-Control-Allow-Credentials", "true"));
     }
 }
 
-mod models;
 mod handlers;
+mod models;
 
 mod pool;
 use pool::Db;
@@ -122,7 +123,7 @@ async fn request_nonce(pubkey: &str, connection: Connection<'_, Db>) -> WebRespo
             id: NotSet,
             pubkey: Set(pubkey.to_string()),
             nonce: Set(nonce.clone()),
-            created_at: Set(Utc::now().naive_utc())
+            created_at: Set(Utc::now().naive_utc()),
         };
 
         let account_copy = account.clone();
@@ -141,7 +142,7 @@ async fn request_nonce(pubkey: &str, connection: Connection<'_, Db>) -> WebRespo
 
         account_copy
     };
-    
+
     let data = json!({ "nonce": account.nonce.as_ref() });
     let response = SysResponse { data };
 
@@ -197,9 +198,6 @@ async fn post_nonce(
     }
 }
 
-#[options("/tasks")]
-async fn options_task() {}
-
 #[post("/tasks", data = "<task_request>")]
 async fn new_task(
     task_request: Json<TaskCreate<'_>>,
@@ -213,8 +211,8 @@ async fn new_task(
     // -- Calculate price
     let price: i32 = match crate::handlers::payment::check_price(request.mint_address).await {
         Ok(price) => price,
-        Err(_) => {
-            let data = json!({ "error": "Failed to calculate price" });
+        Err(e) => {
+            let data = json!({ "error": e.to_string() });
             let response = SysResponse { data };
 
             return (Status::InternalServerError, Json(response));
@@ -244,7 +242,7 @@ async fn new_task(
         mint_address: Set(request.mint_address.to_string()),
         success: Set(false),
         created_at: Set(Utc::now().naive_utc()),
-        price: Set(price)
+        price: Set(price),
     };
 
     let task_check = task.clone();
@@ -253,12 +251,12 @@ async fn new_task(
     let _found_task = if let Some(existing_task) = query_task {
         let cooldown = 12;
         let time_difference = task.created_at.as_ref().time() - existing_task.created_at.time();
-            if time_difference.num_hours() < cooldown {
-                let data = json!({ "error": "NFT is in rankup cooldown" });
-                let response = SysResponse { data };
+        if time_difference.num_hours() < cooldown {
+            let data = json!({ "error": "NFT is in rankup cooldown" });
+            let response = SysResponse { data };
 
-                return (Status::BadRequest, Json(response));
-            }
+            return (Status::BadRequest, Json(response));
+        }
     };
 
     // -- Save Task
@@ -279,9 +277,6 @@ async fn new_task(
     (Status::Created, Json(response))
 }
 
-#[options("/payments")]
-async fn options_payments() {}
-
 #[post("/payments", data = "<payment_request>")]
 async fn new_payment(
     payment_request: Json<PaymentCreate<'_>>,
@@ -291,10 +286,8 @@ async fn new_payment(
     let request = payment_request.into_inner();
     let db = connection.into_inner();
 
-    let query = Tasks::find_by_id(request.task_id)
-        .one(db)
-        .await;
-    
+    let query = Tasks::find_by_id(request.task_id).one(db).await;
+
     let task = {
         let fetch_task = match query {
             Ok(fetch) => fetch,
@@ -324,7 +317,7 @@ async fn new_payment(
         created_at: Set(Utc::now().naive_utc()),
         tx: Set(String::from("")),
         task_id: Set(request.task_id),
-        amount: Set(task.price)
+        amount: Set(task.price),
     };
 
     let payment_clone = new_payment.clone();
@@ -345,9 +338,6 @@ async fn new_payment(
 
     (Status::Created, Json(response))
 }
-
-#[options("/tasks/id/<task_id>")]
-async fn options_task_2(task_id: &str) {}
 
 #[get("/tasks/id/<task_id>")]
 async fn get_task(task_id: &str, connection: Connection<'_, Db>, _auth: ApiKey<'_>) -> WebResponse {
@@ -380,14 +370,15 @@ async fn get_task(task_id: &str, connection: Connection<'_, Db>, _auth: ApiKey<'
     let data = json!({ "task": task });
     let response = SysResponse { data };
 
-    (Status::BadRequest, Json(response))
+    (Status::Accepted, Json(response))
 }
 
-#[options("/tasks/accounts/<account>")]
-async fn options_task_3(account: &str) {}
-
 #[get("/tasks/account/<account>")]
-async fn list_tasks(account: &str, connection: Connection<'_, Db>, _auth: ApiKey<'_>) -> WebResponse {
+async fn list_tasks(
+    account: &str,
+    connection: Connection<'_, Db>,
+    _auth: ApiKey<'_>,
+) -> WebResponse {
     let db = connection.into_inner();
     let fetch = Tasks::find()
         .filter(entity::tasks::Column::Account.contains(account))
@@ -403,17 +394,19 @@ async fn list_tasks(account: &str, connection: Connection<'_, Db>, _auth: ApiKey
             return (Status::BadRequest, Json(response));
         }
     };
+
     let data = json!({ "tasks": tasks });
     let response = SysResponse { data };
 
-    (Status::BadRequest, Json(response))
+    (Status::Accepted, Json(response))
 }
 
-#[options("/payments/id/<payment>")]
-async fn options_payments_2(payment: &str) {}
-
 #[get("/payments/id/<payment_id>")]
-async fn get_payment(payment_id: &str, connection: Connection<'_, Db>, _auth: ApiKey<'_>) -> WebResponse {
+async fn get_payment(
+    payment_id: &str,
+    connection: Connection<'_, Db>,
+    _auth: ApiKey<'_>,
+) -> WebResponse {
     let db = connection.into_inner();
     let fetch = Payments::find()
         .filter(entity::payments::Column::Id.contains(payment_id))
@@ -444,6 +437,35 @@ async fn get_payment(payment_id: &str, connection: Connection<'_, Db>, _auth: Ap
     let response = SysResponse { data };
 
     (Status::BadRequest, Json(response))
+}
+
+#[post("/payments/account/<account>")]
+async fn list_payments(
+    account: &str,
+    connection: Connection<'_, Db>,
+    _auth: ApiKey<'_>,
+) -> WebResponse {
+    let db = connection.into_inner();
+
+    let fetch_payments = Payments::find()
+        .filter(entity::payments::Column::Account.contains(account))
+        .all(db)
+        .await;
+
+    let payments = match fetch_payments {
+        Ok(payments) => payments,
+        Err(_) => {
+            let data = json!({ "error": "Failed to fetch payments" });
+            let response = SysResponse { data };
+
+            return (Status::InternalServerError, Json(response));
+        }
+    };
+
+    let data = json!({ "payments": payments });
+    let response = SysResponse { data };
+
+    (Status::Accepted, Json(response))
 }
 
 #[post("/payments/hook", data = "<payment_receive>")]
@@ -488,7 +510,7 @@ async fn receive_payment(
         Err(_) => {
             let data = json!({ "error": "Invalid signature" });
             let response = SysResponse { data };
-            
+
             return (Status::BadRequest, Json(response));
         }
     };
@@ -498,7 +520,7 @@ async fn receive_payment(
         Err(_) => {
             let data = json!({ "error": "Invalid signature" });
             let response = SysResponse { data };
-            
+
             return (Status::BadRequest, Json(response));
         }
     };
@@ -512,14 +534,12 @@ async fn receive_payment(
         Err(_) => {
             let data = json!({ "error": "Failed to update payment" });
             let response = SysResponse { data };
-            
+
             return (Status::BadRequest, Json(response));
         }
     };
 
-    let fetch_task_by_id = Tasks::find_by_id(payment_clone.id)
-        .one(db)
-        .await;
+    let fetch_task_by_id = Tasks::find_by_id(payment_clone.id).one(db).await;
 
     let mut task = {
         let fetch_task = match fetch_task_by_id {
@@ -544,8 +564,8 @@ async fn receive_payment(
     };
 
     let _update_metadata = match handle_update(&task.mint_address).await {
-        Ok(_) => {},
-        Err(e) => return e
+        Ok(_) => {}
+        Err(e) => return e,
     };
 
     task.success = true;
@@ -560,16 +580,36 @@ async fn receive_payment(
         }
     };
 
-    let data = json!({ "error": "Task does not exist" });
+    let data = json!({ "message": "Payment successful" });
     let response = SysResponse { data };
 
-    (Status::NotFound, Json(response))
+    (Status::Accepted, Json(response))
 }
 
 async fn run_migrations(rocket: Rocket<Build>) -> fairing::Result {
     let conn = &Db::fetch(&rocket).unwrap().conn;
     let _ = migration::Migrator::up(conn, None).await;
     Ok(rocket)
+}
+
+#[derive(Responder)]
+struct OptionsResponder<'a> {
+    status: Status,
+    origin: Header<'a>,
+    methods: Header<'a>,
+    headers: Header<'a>,
+    credentials: Header<'a>,
+}
+
+#[catch(default)]
+async fn options_for_all() -> OptionsResponder<'static> {
+    OptionsResponder {
+        status: Status::Accepted,
+        origin: Header::new("Access-Control-Allow-Origin", "*"),
+        methods: Header::new("Access-Control-Allow-Methods", "POST, GET, PATCH, OPTIONS"),
+        headers: Header::new("Access-Control-Allow-Headers", "*"),
+        credentials: Header::new("Access-Control-Allow-Credentials", "true"),
+    }
 }
 
 #[launch]
@@ -580,9 +620,24 @@ async fn rocket() -> _ {
     let _config: Config = figment.extract().expect("Config file not present");
 
     server
+        .attach(CORS)
         .attach(Db::init())
         .attach(AdHoc::try_on_ignite("Migrations", run_migrations))
         .attach(AdHoc::config::<Config>())
-        .mount("/api", routes![index, request_nonce, post_nonce, new_task, new_payment, get_task, list_tasks, get_payment, receive_payment, options_task, options_task_2, options_task_3, options_payments, options_payments_2])
-        .attach(CORS)
+        .register("/api", catchers![options_for_all])
+        .mount(
+            "/api",
+            routes![
+                index,
+                request_nonce,
+                post_nonce,
+                new_task,
+                new_payment,
+                get_task,
+                get_payment,
+                list_tasks,
+                list_payments,
+                receive_payment
+            ],
+        )
 }
