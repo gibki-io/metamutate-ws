@@ -39,7 +39,7 @@ pub struct TaskCreate<'a> {
 
 #[derive(Deserialize)]
 pub struct PaymentCreate<'a> {
-    pub task_id: &'a str,
+    pub task_id: i32,
     pub account: &'a str
 }
 

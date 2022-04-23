@@ -1,2 +1,2 @@
 [workspace]
-members = ["webserver"]
+members = ["webserver", "migration", "entity"]

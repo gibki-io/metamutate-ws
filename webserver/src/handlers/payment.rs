@@ -1,10 +1,9 @@
 use super::metadata::{get_rank_attribute, verify_metadata, fetch_inner_metadata};
-use rbatis::rbatis::Rbatis;
 use anyhow::{anyhow, Result};
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::signature::Signature;
 
-pub async fn check_price(mint_address: &str, _db: &Rbatis) -> Result<i64> {
+pub async fn check_price(mint_address: &str) -> Result<i32> {
     let rpc: RpcClient = RpcClient::new("https://solport.genesysgo.net/");
     let metadata = match verify_metadata(&rpc, mint_address) {
         Ok(metadata) => metadata,
@@ -18,7 +17,7 @@ pub async fn check_price(mint_address: &str, _db: &Rbatis) -> Result<i64> {
 
     let rank = get_rank_attribute(inner.attributes)?;
 
-    let price: i64 = match rank.value.as_str() {
+    let price: i32 = match rank.value.as_str() {
         "Academy" => 50,
         "Genin" => 100,
         "Chuunin" => 150,
@@ -30,7 +29,7 @@ pub async fn check_price(mint_address: &str, _db: &Rbatis) -> Result<i64> {
     Ok(price)
 }
 
-pub async fn confirm_transaction(signature: &Signature, _db: &Rbatis) -> Result<()> {
+pub async fn confirm_transaction(signature: &Signature) -> Result<()> {
     let rpc = RpcClient::new("https://solport.genesysgo.net/");
 
     let confirmed = rpc.confirm_transaction(signature)?;
