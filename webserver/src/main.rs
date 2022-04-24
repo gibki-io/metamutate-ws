@@ -527,7 +527,7 @@ async fn list_history(
     let db = connection.into_inner();
 
     let fetch_history = History::find()
-        .filter(entity::payments::Column::Account.contains(account))
+        .filter(entity::history::Column::Account.contains(account))
         .all(db)
         .await;
 
