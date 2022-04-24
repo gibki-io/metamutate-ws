@@ -14,7 +14,6 @@ pub struct MetadataInner {
     pub external_url: String,
     pub attributes: Vec<MetadataAttribute>,
     pub properties: MetadataProperties,
-    pub status: MetadataStatus
 }
 
 #[derive(Deserialize, Serialize)]
