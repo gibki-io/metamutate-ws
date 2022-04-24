@@ -1,11 +1,11 @@
 use super::metadata::{get_rank_attribute, verify_metadata, fetch_inner_metadata};
 use anyhow::{anyhow, Result};
 use solana_client::rpc_client::RpcClient;
-use solana_sdk::signature::Signature;
+use solana_sdk::{signature::Signature};
 
 pub async fn check_price(mint_address: &str) -> Result<i32> {
     let rpc: RpcClient = RpcClient::new("https://solport.genesysgo.net/");
-    let metadata = match verify_metadata(&rpc, mint_address) {
+    let metadata = match verify_metadata(&rpc, mint_address).await {
         Ok(metadata) => metadata,
         Err(e) => return Err(anyhow!(format!("verify_metadata: {}", e)))
     };
@@ -15,7 +15,7 @@ pub async fn check_price(mint_address: &str) -> Result<i32> {
         Err(e) => return Err(anyhow!(format!("fetch_inner_metadata: {}", e)))
     };
 
-    let rank = get_rank_attribute(inner.attributes)?;
+    let rank = get_rank_attribute(inner.attributes).await?;
 
     let price: i32 = match rank.value.as_str() {
         "Academy" => 250,
@@ -27,17 +27,4 @@ pub async fn check_price(mint_address: &str) -> Result<i32> {
     };
 
     Ok(price)
-}
-
-pub async fn confirm_transaction(signature: &Signature) -> Result<()> {
-    let rpc = RpcClient::new("https://solport.genesysgo.net/");
-
-    let confirmed = rpc.confirm_transaction(signature)?;
-
-    loop {
-        if confirmed {
-            break
-        }
-    }
-    Ok(())
 }

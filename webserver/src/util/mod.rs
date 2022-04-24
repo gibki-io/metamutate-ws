@@ -45,7 +45,7 @@ pub struct PaymentCreate<'a> {
 
 #[derive(Deserialize)]
 pub struct PaymentReceive<'a> {
-    pub payment_id: &'a str,
+    pub payment_id: i32,
     pub tx_id: &'a str
 }
 

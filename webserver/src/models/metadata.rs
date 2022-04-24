@@ -4,7 +4,7 @@ pub struct _MetadataRoot {
     pub root: MetadataInner
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct MetadataInner {
     pub name: String,
     pub symbol: String,
@@ -16,26 +16,26 @@ pub struct MetadataInner {
     pub properties: MetadataProperties,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct MetadataAttribute {
     pub trait_type: String,
     pub value: String
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct MetadataProperties {
     pub files: Vec<PropertyFiles>,
     pub category: String,
     pub creators: Vec<PropertyCreators>
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct PropertyCreators {
     pub address: String,
     pub share: u16
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct PropertyFiles {
     pub uri: String,
     #[serde(rename = "type")]

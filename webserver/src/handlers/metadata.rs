@@ -2,144 +2,84 @@ use crate::{
     models::{
         metadata::{MetadataAttribute, MetadataInner},
     },
-    util::{SysResponse, WebResponse},
 };
 use anyhow::{anyhow, Result as AnyResult};
 use mpl_token_metadata::state::Metadata;
 use rand::Rng;
 use reqwest::blocking::multipart;
-use rocket::serde::json::Json;
-use rocket::{http::Status};
 use serde_json::{json, value::to_value, Value};
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::signature::Keypair;
 use std::fs::File;
 use metaboss::update_metadata::update_uri;
+use tokio::task;
 
 const VERIFIED_CREATOR: &str = "Bf2jdfoFrqVS2n6eDtzzmb8cbue7B1ibcZF4QCvruqav";
 
-pub async fn handle_update(mint_account: &'_ str) -> Result<(), WebResponse>{
-    let rpc: RpcClient = RpcClient::new("https://solport.genesysgo.net/");
+pub async fn handle_update(mint_account: &'_ str) -> AnyResult<()>{
+    let rpc = RpcClient::new_with_commitment(
+        "https://solport.genesysgo.net/", 
+        solana_sdk::commitment_config::CommitmentConfig::confirmed()
+    );
 
-    let metadata = match verify_metadata(&rpc, mint_account) {
-        Ok(metadata) => metadata,
-        Err(_e) => {
-            let data = json!({ "error": "NFT entered is not from the right collection" });
-            let response = SysResponse { data };
+    let rpc2 = RpcClient::new_with_commitment(
+        "https://solport.genesysgo.net/", 
+        solana_sdk::commitment_config::CommitmentConfig::confirmed()
+    );
 
-            return Err((Status::Forbidden, Json(response)));
-        }
-    };
+    let mint_verify = mint_account.to_owned().clone();
+    let mint_upload = mint_account.to_owned().clone();
 
-    let mut inner = match fetch_inner_metadata(metadata, mint_account).await {
-        Ok(inner) => inner,
-        Err(_e) => {
-            let data = json!({ "error": "Failed to fetch metadata uri" });
-            let response = SysResponse { data };
-
-            return Err((Status::InternalServerError, Json(response)));
-        }
-    };
-
-    let new_attributes = match rank_up(inner.attributes) {
-        Ok(new_attributes) => new_attributes,
-        Err(_e) => {
-            let data = json!({ "error": "Failed to rank up NFT" });
-            let response = SysResponse { data };
-
-            return Err((Status::InternalServerError, Json(response)));
-        }
-    };
+    let metadata = verify_metadata(&rpc, &mint_verify).await?;
+    let mut inner = fetch_inner_metadata(metadata, mint_account).await?;
+    let new_attributes = rank_up(inner.attributes).await?;
 
     inner.attributes = new_attributes;
 
-    match save_metadata(inner, mint_account).await {
-        Ok(_) => (),
-        Err(_) => {
-            let data = json!({ "error": "Failed to save NFT" });
-            let response = SysResponse { data };
-
-            return Err((Status::InternalServerError, Json(response)));
-        }
-    };
+    save_metadata(inner, mint_account).await?;
 
     // Upload Metadata to IPFS
-    let ipfs = match upload_to_ipfs(mint_account) {
-        Ok(response) => response,
-        Err(_) => {
-            let data = json!({ "error": "Failed to upload to IPFS" });
-            let response = SysResponse { data };
-
-            return Err((Status::InternalServerError, Json(response)));
-        }
-    };
+    let ipfs = upload_to_ipfs(mint_account).await?;
 
     let _status = match ipfs["ok"].as_bool() {
         Some(ok) => {
             if !ok {
-                let data = json!({ "error": "Failed to upload to IPFS" });
-                let response = SysResponse { data };
-
-                return Err((Status::NotFound, Json(response)));
+                println!("{}", ipfs);
+                return Err(anyhow::anyhow!("IPFS upload unsuccessful"));
             }
         },
         None => {
-            let data = json!({ "error": "Failed to upload to IPFS" });
-            let response = SysResponse { data };
-
-            return Err((Status::NotFound, Json(response)));
+            return Err(anyhow::anyhow!("IPFS upload status missing"))
         }
     };
 
     let cid = match ipfs["value"]["cid"].as_str() {
         Some(cid) => cid,
         None => {
-            let data = json!({ "error": "Failed to retrieve IPFS CID" });
-            let response = SysResponse { data };
-
-            return Err((Status::NotFound, Json(response)));
+            return Err(anyhow::anyhow!("IPFS cid is missing"));
         }
     };
 
     // Upload Metadata to Metaplex
-    let keys = match std::fs::read("./keys/kamakura.json") {
-        Ok(keys) => keys,
-        Err(_) => {
-            let data = json!({ "error": "Failed to retrieve signing keys" });
-            let response = SysResponse { data };
-
-            return Err((Status::InternalServerError, Json(response)));
-        }
-    };
+    let keys = tokio::fs::read("./keys/kamakura.json").await?;
 
     let private_keys: &[u8] = &keys;
 
     let keypair = match Keypair::from_bytes(private_keys) {
         Ok(keypair) => keypair,
         Err(_) => {
-            let data = json!({ "error": "Failed to retrieve signing keys" });
-            let response = SysResponse { data };
-
-            return Err((Status::InternalServerError, Json(response)));
+            return Err(anyhow::anyhow!("Failed to parse authority keys"))
         }
     };
 
     let mpl_uri = format!("https://nftstorage.link/ipfs/{}/{}.json", cid, mint_account);
 
-    match update_uri(&rpc, &keypair, mint_account, mpl_uri.as_str()) {
-        Ok(_) => (),
-        Err(_) => {
-            let data = json!({ "error": "Failed to upload metadata uri to Metaplex" });
-            let response = SysResponse { data };
-
-            return Err((Status::InternalServerError, Json(response)));
-        }
-    };
-
+    task::spawn_blocking(move || update_uri(&rpc2, &keypair, &mint_upload, mpl_uri.as_str())).await??;
+    
     Ok(())
 }
 
-pub fn verify_metadata(rpc: &RpcClient, mint_account: &str) -> AnyResult<Metadata> {
+pub async fn verify_metadata(rpc: &RpcClient, mint_account: &str) -> AnyResult<Metadata> {
     let metadata = metaboss::decode::decode(rpc, mint_account)?;
     let creators = metadata.data.creators.as_ref().unwrap();
 
@@ -151,7 +91,7 @@ pub fn verify_metadata(rpc: &RpcClient, mint_account: &str) -> AnyResult<Metadat
     Ok(metadata)
 }
 
-pub fn get_rank_attribute(attributes: Vec<MetadataAttribute>) -> AnyResult<MetadataAttribute> {
+pub async fn get_rank_attribute(attributes: Vec<MetadataAttribute>) -> AnyResult<MetadataAttribute> {
     let mut _rank_attribute = if let Some(rank) = attributes
         .into_iter()
         .find(|rank| rank.trait_type == *"Rank")
@@ -162,7 +102,7 @@ pub fn get_rank_attribute(attributes: Vec<MetadataAttribute>) -> AnyResult<Metad
     };
 }
 
-pub fn rank_up(attributes: Vec<MetadataAttribute>) -> AnyResult<Vec<MetadataAttribute>> {
+pub async fn rank_up(attributes: Vec<MetadataAttribute>) -> AnyResult<Vec<MetadataAttribute>> {
     let mut json_attributes = to_value(attributes)?;
     let current_rank = json_attributes[0]["value"].as_str().unwrap();
 
@@ -199,30 +139,52 @@ pub fn rank_up(attributes: Vec<MetadataAttribute>) -> AnyResult<Vec<MetadataAttr
 pub async fn fetch_inner_metadata(metadata: Metadata, mint_account: &str) -> AnyResult<MetadataInner> {
     let uri = metadata.data.uri;
     let inner_metadata = reqwest::get(uri).await?.json::<MetadataInner>().await?;
+    let im = inner_metadata.clone();
 
     let path = format!("./metadata/{}.json", mint_account);
-    serde_json::to_writer(&File::create(path)?, &inner_metadata)?;
+    let writer = task::spawn_blocking(move || File::create(path)).await??;
+    task::spawn_blocking(move || serde_json::to_writer(&writer, &inner_metadata)).await??;
 
-    Ok(inner_metadata)
+    Ok(im)
 }
 
 pub async fn save_metadata(inner_metadata: MetadataInner, mint_account: &str) -> AnyResult<()> {
     let path = format!("./metadata/{}.json", mint_account);
-    serde_json::to_writer(&File::create(path)?, &inner_metadata)?;
+    let writer = task::spawn_blocking(move || File::create(path)).await??;
+    task::spawn_blocking(move || serde_json::to_writer(&writer, &inner_metadata)).await??;
 
     Ok(())
 }
 
-pub fn upload_to_ipfs(mint_account: &'_ str) -> AnyResult<Value> {
-    let address = mint_account;
-    let form = multipart::Form::new()
-        .file(format!("{}.json", address), format!("./metadata/{}.json", address))?;
-        
-    let client = reqwest::blocking::Client::new();
-    let response = client
-        .post("https://api.nft.storage/upload")
-        .multipart(form)
-        .send()?
-        .json::<Value>()?;
+pub async fn upload_to_ipfs(mint_account: &'_ str) -> AnyResult<Value> {
+    let mint_account = mint_account.to_owned();
+    let response = task::spawn_blocking(move || {
+        let address = mint_account;
+        let form = multipart::Form::new()
+            .file(format!("{}.json", address), format!("./metadata/{}.json", address))?;
+
+            println!("./metadata/{}.json", address);
+            
+        let client = reqwest::blocking::Client::new();
+        let response = client
+            .post("https://api.nft.storage/upload")
+            .header("Authorization", format!("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkaWQ6ZXRocjoweDc2ODgzMkQ0MWRhNjNjOWZlQkFCRjAwNWU5ODlENWU4MEFGOTJFRDEiLCJpc3MiOiJuZnQtc3RvcmFnZSIsImlhdCI6MTY1MDAxODU3Njc3NSwibmFtZSI6IkthbWFrdXJhIn0.SfItpLGzaCQmLKCNLXJ_u8cwGPk41Eo_bgj5c8rZVNQ"))
+            .multipart(form)
+            .send();
+
+        let return_value = match response {
+            Ok(sent) => sent,
+            Err(e) => return Err(anyhow::anyhow!(e))
+        };
+
+        let blocking_done = match return_value.json::<Value>() {
+            Ok(value) => value,
+            Err(e) => return Err(anyhow::anyhow!(e))
+        };
+
+        Ok(blocking_done)
+    }).await??;
+
     Ok(response)
+    
 }

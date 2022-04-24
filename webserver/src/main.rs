@@ -245,8 +245,6 @@ async fn new_task(
         price: Set(price),
     };
 
-    let task_check = task.clone();
-
     // -- Check existing successful rankups if past cooldown period
     let _found_task = if let Some(existing_task) = query_task {
         let cooldown = 12;
@@ -276,7 +274,7 @@ async fn new_task(
         .order_by_desc(entity::tasks::Column::CreatedAt)
         .one(db)
         .await;
-    
+
     let task_query = match fetch_task {
         Ok(query) => query,
         Err(e) => {
@@ -529,7 +527,7 @@ async fn receive_payment(
     let db = connection.into_inner();
 
     let fetch_payment_by_id = Payments::find()
-        .filter(entity::payments::Column::Id.contains(request.payment_id))
+        .filter(entity::payments::Column::Id.eq(request.payment_id))
         .one(db)
         .await;
 
@@ -555,42 +553,22 @@ async fn receive_payment(
         }
     };
 
+    let sig_bytes = match bs58::decode(request.tx_id).into_vec() {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            let data = json!({ "error": "Invalid signature" });
+            let response = SysResponse { data };
+
+            return (Status::BadRequest, Json(response));
+        }
+    };
+
     // Verify Transaction Signature
-    let signature = match solana_sdk::signature::Signature::from_str(request.tx_id) {
-        Ok(signature) => signature,
-        Err(_) => {
-            let data = json!({ "error": "Invalid signature" });
-            let response = SysResponse { data };
+    let _signature = solana_sdk::signature::Signature::new(&sig_bytes);
 
-            return (Status::BadRequest, Json(response));
-        }
-    };
-
-    let _confirm_result = match crate::handlers::payment::confirm_transaction(&signature).await {
-        Ok(_) => (),
-        Err(_) => {
-            let data = json!({ "error": "Invalid signature" });
-            let response = SysResponse { data };
-
-            return (Status::BadRequest, Json(response));
-        }
-    };
     payment.success = true;
-    let payment_clone = payment.clone();
-    let updated_payment: entity::payments::ActiveModel = payment.into();
 
-    // Set Payment to Success
-    let _confirm_payment = match updated_payment.save(db).await {
-        Ok(_) => (),
-        Err(_) => {
-            let data = json!({ "error": "Failed to update payment" });
-            let response = SysResponse { data };
-
-            return (Status::BadRequest, Json(response));
-        }
-    };
-
-    let fetch_task_by_id = Tasks::find_by_id(payment_clone.id).one(db).await;
+    let fetch_task_by_id = Tasks::find_by_id(payment.id).one(db).await;
 
     let mut task = {
         let fetch_task = match fetch_task_by_id {
@@ -615,8 +593,15 @@ async fn receive_payment(
     };
 
     let _update_metadata = match handle_update(&task.mint_address).await {
-        Ok(_) => {}
-        Err(e) => return e,
+        Ok(_) => {
+            ()
+        }
+        Err(e) => {
+            let data = json!({ "error": e.to_string() });
+            let response = SysResponse { data };
+
+            return (Status::InternalServerError, Json(response));
+        }
     };
 
     task.success = true;
