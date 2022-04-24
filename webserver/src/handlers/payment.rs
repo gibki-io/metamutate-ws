@@ -7,12 +7,12 @@ pub async fn check_price(mint_address: &str) -> Result<i32> {
     let rpc: RpcClient = RpcClient::new("https://solport.genesysgo.net/");
     let metadata = match verify_metadata(&rpc, mint_address) {
         Ok(metadata) => metadata,
-        Err(e) => return Err(anyhow!(e))
+        Err(e) => return Err(anyhow!(format!("verify_metadata: {}", e)))
     };
 
     let inner = match fetch_inner_metadata(metadata, mint_address).await {
         Ok(inner) => inner,
-        Err(e) => return Err(anyhow!(e))
+        Err(e) => return Err(anyhow!(format!("fetch_inner_metadata: {}", e)))
     };
 
     let rank = get_rank_attribute(inner.attributes)?;
