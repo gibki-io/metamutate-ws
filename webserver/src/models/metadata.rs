@@ -24,7 +24,7 @@ pub struct MetadataAttribute {
 
 #[derive(Deserialize, Serialize)]
 pub struct MetadataProperties {
-    pub files: PropertyFiles,
+    pub files: Vec<PropertyFiles>,
     pub category: String,
     pub creators: Vec<PropertyCreators>
 }
