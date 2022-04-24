@@ -172,7 +172,7 @@ pub fn rank_up(attributes: Vec<MetadataAttribute>) -> AnyResult<Vec<MetadataAttr
         "Genin" => 50,
         "Chuunin" => 70,
         "Jounin" => 80,
-        "Special Jonin" => 90,
+        "Special Jounin" => 90,
         _ => return Err(anyhow!("Not a valid rank to use for rankup")),
     };
 
@@ -181,8 +181,8 @@ pub fn rank_up(attributes: Vec<MetadataAttribute>) -> AnyResult<Vec<MetadataAttr
             "Academy" => "Genin",
             "Genin" => "Chuunin",
             "Chuunin" => "Jonin",
-            "Jounin" => "Special Jonin",
-            "Special Jonin" => "Kage",
+            "Jounin" => "Special Jounin",
+            "Special Jounin" => "Kage",
             "Kage" => "Kage",
             _ => return Err(anyhow!("Not a valid rank to use for rankup")),
         }
