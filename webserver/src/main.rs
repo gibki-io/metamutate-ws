@@ -315,7 +315,7 @@ async fn new_payment(
         account: Set(request.account.to_string()),
         success: Set(false),
         created_at: Set(Utc::now().naive_utc()),
-        tx: Set(String::from("")),
+        tx: Set(String::from("none")),
         task_id: Set(request.task_id),
         amount: Set(task.price),
     };
@@ -324,8 +324,8 @@ async fn new_payment(
 
     match new_payment.save(db).await {
         Ok(_) => (),
-        Err(_) => {
-            let data = json!({ "error": "Failed to save payment to database" });
+        Err(e) => {
+            let data = json!({ "error": e.to_string() });
             let response = SysResponse { data };
 
             return (Status::InternalServerError, Json(response));

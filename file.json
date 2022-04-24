@@ -1,0 +1,73 @@
+{
+    "name": "Kamakura #2058",
+    "symbol": "KMK",
+    "description": "Collection of 3333 Shinobis defending Kamakura Village",
+    "seller_fee_basis_points": 700,
+    "image": "https://bafybeif3slturush3ejwfqkbahpkzvni7o36tkxzvqbbss7ynj2n2y6e5e.ipfs.nftstorage.link/2057.png?ext=png",
+    "external_url": "https://www.kamakuranft.com",
+    "attributes": [
+        {
+            "trait_type": "Rank",
+            "value": "Academy"
+        },
+        {
+            "trait_type": "Background",
+            "value": "Grass Aqua Marine "
+        },
+        {
+            "trait_type": "Back Accessories",
+            "value": "Single Spear "
+        },
+        {
+            "trait_type": "Skin",
+            "value": "Dark War Red "
+        },
+        {
+            "trait_type": "Eyes",
+            "value": "Gojo Eyes "
+        },
+        {
+            "trait_type": "Hair",
+            "value": "Curly Brown "
+        },
+        {
+            "trait_type": "Clothes",
+            "value": "Cyber Neon "
+        },
+        {
+            "trait_type": "Face Mask",
+            "value": "Oni Blue "
+        },
+        {
+            "trait_type": "Head Mask",
+            "value": "Onimask "
+        },
+        {
+            "trait_type": "Ear Accessories",
+            "value": "Crescent Blue "
+        }
+    ],
+    "properties": {
+        "files": [
+            {
+                "uri": "https://bafybeif3slturush3ejwfqkbahpkzvni7o36tkxzvqbbss7ynj2n2y6e5e.ipfs.nftstorage.link/2057.png?ext=png",
+                "type": "image/png"
+            }
+        ],
+        "category": "image",
+        "creators": [
+            {
+                "address": "RRUMF9KYPcvNSmnicNMAFKx5wDYix3wjNa6bA7R6xqA",
+                "share": 10
+            },
+            {
+                "address": "AUA412EdZMh16ToV4raFc6HzFM2nSDKbZz4ozteEavPe",
+                "share": 45
+            },
+            {
+                "address": "7PuvfsQ6CyMZ4JzqXkJ72q6rmxcW3w3ooxX5VyspGyJo",
+                "share": 45
+            }
+        ]
+    }
+}
