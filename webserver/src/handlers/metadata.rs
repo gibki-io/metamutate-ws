@@ -160,16 +160,17 @@ pub async fn upload_to_ipfs(mint_account: &'_ str) -> AnyResult<Value> {
     let mint_account = mint_account.to_owned();
     let response = task::spawn_blocking(move || {
         let address = mint_account;
-        let form = multipart::Form::new()
-            .file(format!("{}.json", address), format!("./metadata/{}.json", address))?;
 
-            println!("./metadata/{}.json", address);
+        let path = format!("./metadata/{}.json", address);
+        let file = std::fs::File::open(path)?;
+
+            println!("./metadata/{}.json", &address);
             
         let client = reqwest::blocking::Client::new();
         let response = client
             .post("https://api.nft.storage/upload")
             .header("Authorization", format!("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkaWQ6ZXRocjoweDc2ODgzMkQ0MWRhNjNjOWZlQkFCRjAwNWU5ODlENWU4MEFGOTJFRDEiLCJpc3MiOiJuZnQtc3RvcmFnZSIsImlhdCI6MTY1MDAxODU3Njc3NSwibmFtZSI6IkthbWFrdXJhIn0.SfItpLGzaCQmLKCNLXJ_u8cwGPk41Eo_bgj5c8rZVNQ"))
-            .multipart(form)
+            .body(file)
             .send();
 
         let return_value = match response {
