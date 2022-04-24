@@ -518,6 +518,35 @@ async fn list_payments(
     (Status::Accepted, Json(response))
 }
 
+#[post("/history/account/<account>")]
+async fn list_history(
+    account: &str,
+    connection: Connection<'_, Db>,
+    _auth: ApiKey<'_>,
+) -> WebResponse {
+    let db = connection.into_inner();
+
+    let fetch_history = History::find()
+        .filter(entity::payments::Column::Account.contains(account))
+        .all(db)
+        .await;
+
+    let history = match fetch_history {
+        Ok(history) => history,
+        Err(_) => {
+            let data = json!({ "error": "Failed to fetch payments" });
+            let response = SysResponse { data };
+
+            return (Status::InternalServerError, Json(response));
+        }
+    };
+
+    let data = json!({ "history": history });
+    let response = SysResponse { data };
+
+    (Status::Accepted, Json(response))
+}
+
 #[post("/payments/hook", data = "<payment_receive>")]
 async fn receive_payment(
     payment_receive: Json<PaymentReceive<'_>>,
@@ -683,6 +712,7 @@ async fn rocket() -> _ {
                 get_payment,
                 list_tasks,
                 list_payments,
+                list_history,
                 receive_payment
             ],
         )
