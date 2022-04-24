@@ -4,3 +4,4 @@ pub use super::accounts::Entity as Accounts;
 pub use super::payments::Entity as Payments;
 pub use super::seaql_migrations::Entity as SeaqlMigrations;
 pub use super::tasks::Entity as Tasks;
+pub use super::history::Entity as History;

@@ -1,4 +1,4 @@
-use entity::{accounts, payments, tasks};
+use entity::{accounts, payments, tasks, history};
 use sea_schema::migration::prelude::*;
 
 pub struct Migration;
@@ -69,6 +69,29 @@ impl MigrationTrait for Migration {
             .col(ColumnDef::new(tasks::Column::Success).boolean().not_null())
             .to_owned()
         )
+        .await?;
+
+        manager.create_table(
+            Table::create()
+            .table(history::Entity)
+            .if_not_exists()
+            .col(
+                ColumnDef::new(tasks::Column::Id)
+                .integer()
+                .not_null()
+                .auto_increment()
+                .primary_key()
+            )
+            .col(ColumnDef::new(history::Column::Account).string().not_null())
+            .col(ColumnDef::new(history::Column::TaskId).integer().not_null())
+            .col(ColumnDef::new(history::Column::PaymentId).integer().not_null())
+            .col(ColumnDef::new(history::Column::FinishedAt).date_time().not_null())
+            .col(ColumnDef::new(history::Column::MintAddress).string().not_null())
+            .col(ColumnDef::new(history::Column::Signature).string().not_null())
+            .col(ColumnDef::new(history::Column::Price).integer().not_null())
+            .col(ColumnDef::new(history::Column::Success).boolean().not_null())
+            .to_owned()
+        )
         .await
     }
 
@@ -90,6 +113,12 @@ impl MigrationTrait for Migration {
         manager.drop_table(
             Table::drop()
             .table(tasks::Entity)
+            .to_owned()
+        ).await?;
+
+        manager.drop_table(
+            Table::drop()
+            .table(history::Entity)
             .to_owned()
         ).await
     }

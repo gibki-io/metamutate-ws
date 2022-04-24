@@ -16,7 +16,7 @@ use tokio::task;
 
 const VERIFIED_CREATOR: &str = "Bf2jdfoFrqVS2n6eDtzzmb8cbue7B1ibcZF4QCvruqav";
 
-pub async fn handle_update(mint_account: &'_ str) -> AnyResult<()>{
+pub async fn handle_update(mint_account: &'_ str) -> AnyResult<bool>{
     let rpc = RpcClient::new_with_commitment(
         "https://solport.genesysgo.net/", 
         solana_sdk::commitment_config::CommitmentConfig::confirmed()
@@ -32,7 +32,10 @@ pub async fn handle_update(mint_account: &'_ str) -> AnyResult<()>{
 
     let metadata = verify_metadata(&rpc, &mint_verify).await?;
     let mut inner = fetch_inner_metadata(metadata, mint_account).await?;
-    let new_attributes = rank_up(inner.attributes).await?;
+    let rankup_result = rank_up(inner.attributes).await?;
+    let (new_attributes, successful) = match rankup_result {
+        (attributes, successful) => (attributes, successful)
+    };
 
     inner.attributes = new_attributes;
 
@@ -72,11 +75,11 @@ pub async fn handle_update(mint_account: &'_ str) -> AnyResult<()>{
         }
     };
 
-    let mpl_uri = format!("https://nftstorage.link/ipfs/{}/{}.json", cid, mint_account);
+    let mpl_uri = format!("https://{}.ipfs.nftstorage.link", cid);
 
     task::spawn_blocking(move || update_uri(&rpc2, &keypair, &mint_upload, mpl_uri.as_str())).await??;
     
-    Ok(())
+    Ok(successful)
 }
 
 pub async fn verify_metadata(rpc: &RpcClient, mint_account: &str) -> AnyResult<Metadata> {
@@ -102,7 +105,7 @@ pub async fn get_rank_attribute(attributes: Vec<MetadataAttribute>) -> AnyResult
     };
 }
 
-pub async fn rank_up(attributes: Vec<MetadataAttribute>) -> AnyResult<Vec<MetadataAttribute>> {
+pub async fn rank_up(attributes: Vec<MetadataAttribute>) -> AnyResult<(Vec<MetadataAttribute>, bool)> {
     let mut json_attributes = to_value(attributes)?;
     let current_rank = json_attributes[0]["value"].as_str().unwrap();
 
@@ -114,6 +117,12 @@ pub async fn rank_up(attributes: Vec<MetadataAttribute>) -> AnyResult<Vec<Metada
         "Jounin" => 80,
         "Special Jounin" => 90,
         _ => return Err(anyhow!("Not a valid rank to use for rankup")),
+    };
+
+    let successful = if chance >= denominator {
+        true
+    } else {
+        false
     };
 
     let new_rank = if chance >= denominator {
@@ -133,7 +142,7 @@ pub async fn rank_up(attributes: Vec<MetadataAttribute>) -> AnyResult<Vec<Metada
     json_attributes[0]["value"] = json!(new_rank);
     let new_attributes: Vec<MetadataAttribute> = serde_json::from_value(json_attributes)?;
 
-    Ok(new_attributes)
+    Ok((new_attributes, successful))
 }
 
 pub async fn fetch_inner_metadata(metadata: Metadata, mint_account: &str) -> AnyResult<MetadataInner> {

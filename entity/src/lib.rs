@@ -6,3 +6,4 @@ pub mod accounts;
 pub mod payments;
 pub mod seaql_migrations;
 pub mod tasks;
+pub mod history;

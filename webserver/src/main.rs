@@ -20,6 +20,7 @@ use util::{
 };
 
 use entity::accounts::Entity as Accounts;
+use entity::history::Entity as History;
 use entity::payments::Entity as Payments;
 pub use entity::prelude::*;
 use entity::tasks::Entity as Tasks;
@@ -523,16 +524,19 @@ async fn receive_payment(
     connection: Connection<'_, Db>,
     _auth: ApiKey<'_>,
 ) -> WebResponse {
+    type PaymentsModel = entity::payments::Model;
+    type TasksModel = entity::tasks::Model;
+
     let request = payment_receive.into_inner();
     let db = connection.into_inner();
 
-    let fetch_payment_by_id = Payments::find()
+    let fetch_payment_by_id: Result<Option<PaymentsModel>, sea_orm::DbErr> = Payments::find()
         .filter(entity::payments::Column::Id.eq(request.payment_id))
         .one(db)
         .await;
 
-    let mut payment = {
-        let fetch_payment = match fetch_payment_by_id {
+    let payment: PaymentsModel = {
+        let fetch_payment: Option<PaymentsModel> = match fetch_payment_by_id {
             Ok(found) => found,
             Err(_) => {
                 let data = json!({ "error": "Failed to fetch payment" });
@@ -566,11 +570,9 @@ async fn receive_payment(
     // Verify Transaction Signature
     let _signature = solana_sdk::signature::Signature::new(&sig_bytes);
 
-    payment.success = true;
-
     let fetch_task_by_id = Tasks::find_by_id(payment.id).one(db).await;
 
-    let mut task = {
+    let task: TasksModel = {
         let fetch_task = match fetch_task_by_id {
             Ok(fetch) => fetch,
             Err(_) => {
@@ -592,10 +594,8 @@ async fn receive_payment(
         }
     };
 
-    let _update_metadata = match handle_update(&task.mint_address).await {
-        Ok(_) => {
-            ()
-        }
+    let success = match handle_update(&task.mint_address).await {
+        Ok(val) => val,
         Err(e) => {
             let data = json!({ "error": e.to_string() });
             let response = SysResponse { data };
@@ -604,17 +604,27 @@ async fn receive_payment(
         }
     };
 
-    task.success = true;
-    let updated_task: entity::tasks::ActiveModel = task.into();
-    let _update_task = match updated_task.save(db).await {
+    let new_history = entity::history::ActiveModel {
+        id: NotSet,
+        account: Set(payment.account),
+        mint_address: Set(task.mint_address),
+        finished_at: Set(Utc::now().naive_utc()),
+        payment_id: Set(payment.id),
+        task_id: Set(task.id),
+        signature: Set(request.tx_id.to_string()),
+        price: Set(task.price),
+        success: Set(success),
+    };
+
+    match new_history.save(db).await {
         Ok(_) => (),
-        Err(_) => {
-            let data = json!({ "error": "Failed to update task" });
+        Err(e) => {
+            let data = json!({ "error": e.to_string() });
             let response = SysResponse { data };
 
-            return (Status::NotFound, Json(response));
+            return (Status::InternalServerError, Json(response))
         }
-    };
+    }
 
     let data = json!({ "message": "Payment successful" });
     let response = SysResponse { data };
