@@ -45,7 +45,7 @@ impl MigrationTrait for Migration {
                 .col(ColumnDef::new(payments::Column::Amount).integer().not_null())
                 .col(ColumnDef::new(payments::Column::CreatedAt).date_time().not_null())
                 .col(ColumnDef::new(payments::Column::Success).boolean().not_null())
-                .col(ColumnDef::new(payments::Column::TaskId).string().not_null())
+                .col(ColumnDef::new(payments::Column::TaskId).integer().not_null())
                 .col(ColumnDef::new(payments::Column::Tx).string().not_null())
                 .to_owned()
         )
