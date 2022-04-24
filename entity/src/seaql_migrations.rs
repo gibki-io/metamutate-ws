@@ -3,14 +3,11 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "accounts")]
+#[sea_orm(table_name = "seaql_migrations")]
 pub struct Model {
-    #[sea_orm(primary_key)]
-    pub id: i32,
-    pub nonce: String,
-    pub pubkey: String,
-    #[sea_orm(column_type = "DateTime")]
-    pub created_at: DateTime,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub version: String,
+    pub applied_at: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter)]

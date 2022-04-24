@@ -268,10 +268,37 @@ async fn new_task(
 
             return (Status::InternalServerError, Json(response));
         }
-    }
+    };
+
+    let fetch_task = Tasks::find()
+        .filter(entity::tasks::Column::MintAddress.contains(request.mint_address))
+        .filter(entity::tasks::Column::Account.contains(request.account))
+        .order_by_desc(entity::tasks::Column::CreatedAt)
+        .one(db)
+        .await;
+    
+    let task_query = match fetch_task {
+        Ok(query) => query,
+        Err(e) => {
+            let data = json!({ "error": e.to_string() });
+            let response = SysResponse { data };
+
+            return (Status::InternalServerError, Json(response));
+        }
+    };
+
+    let return_task = match task_query {
+        Some(task) => task,
+        None => {
+            let data = json!({ "error": "Missing task" });
+            let response = SysResponse { data };
+
+            return (Status::NotFound, Json(response));
+        }
+    };
 
     // -> Send Task Created Response
-    let data = json!({ "task_id": task_check.id.as_ref() });
+    let data = json!({ "task_id": return_task.id });
     let response = SysResponse { data };
 
     (Status::Created, Json(response))
@@ -320,8 +347,6 @@ async fn new_payment(
         amount: Set(task.price),
     };
 
-    let payment_clone = new_payment.clone();
-
     match new_payment.save(db).await {
         Ok(_) => (),
         Err(e) => {
@@ -332,8 +357,34 @@ async fn new_payment(
         }
     }
 
+    let return_payment = Payments::find()
+        .filter(entity::payments::Column::TaskId.eq(request.task_id))
+        .order_by_desc(entity::payments::Column::CreatedAt)
+        .one(db)
+        .await;
+
+    let payment_query = match return_payment {
+        Ok(query) => query,
+        Err(e) => {
+            let data = json!({ "error": e.to_string() });
+            let response = SysResponse { data };
+
+            return (Status::NotFound, Json(response));
+        }
+    };
+
+    let payment_clone = match payment_query {
+        Some(payment) => payment,
+        None => {
+            let data = json!({ "error": "Missing payment object" });
+            let response = SysResponse { data };
+
+            return (Status::NotFound, Json(response));
+        }
+    };
+
     // -> paymentid
-    let data = json!({ "payment_id": payment_clone.id.as_ref() });
+    let data = json!({ "payment_id": payment_clone.id });
     let response = SysResponse { data };
 
     (Status::Created, Json(response))

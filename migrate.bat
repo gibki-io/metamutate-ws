@@ -1,3 +1,3 @@
 set DATABASE_URL=sqlite://database.db?mode=rwc
 
-cargo run --bin migration -- fresh
+sea-orm-cli migrate fresh
