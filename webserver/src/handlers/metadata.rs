@@ -40,11 +40,11 @@ pub async fn handle_update(mint_account: &'_ str) -> AnyResult<()>{
 
     // Upload Metadata to IPFS
     let ipfs = upload_to_ipfs(mint_account).await?;
+    println!("{}", ipfs);
 
     let _status = match ipfs["ok"].as_bool() {
         Some(ok) => {
             if !ok {
-                println!("{}", ipfs);
                 return Err(anyhow::anyhow!("IPFS upload unsuccessful"));
             }
         },
@@ -61,11 +61,11 @@ pub async fn handle_update(mint_account: &'_ str) -> AnyResult<()>{
     };
 
     // Upload Metadata to Metaplex
-    let keys = tokio::fs::read("./keys/kamakura.json").await?;
+    let raw_keys = tokio::fs::read("./keys/kamakura.json").await?;
+    let b58_keys = String::from_utf8_lossy(&raw_keys);
+    let keys = bs58::decode(b58_keys.as_ref()).into_vec()?;
 
-    let private_keys: &[u8] = &keys;
-
-    let keypair = match Keypair::from_bytes(private_keys) {
+    let keypair = match Keypair::from_bytes(&keys) {
         Ok(keypair) => keypair,
         Err(_) => {
             return Err(anyhow::anyhow!("Failed to parse authority keys"))
@@ -163,8 +163,6 @@ pub async fn upload_to_ipfs(mint_account: &'_ str) -> AnyResult<Value> {
 
         let path = format!("./metadata/{}.json", address);
         let file = std::fs::File::open(path)?;
-
-            println!("./metadata/{}.json", &address);
             
         let client = reqwest::blocking::Client::new();
         let response = client
