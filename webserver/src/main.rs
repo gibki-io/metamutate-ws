@@ -533,8 +533,8 @@ async fn list_history(
 
     let history = match fetch_history {
         Ok(history) => history,
-        Err(_) => {
-            let data = json!({ "error": "Failed to fetch payments" });
+        Err(e) => {
+            let data = json!({ "error": e.to_string() });
             let response = SysResponse { data };
 
             return (Status::InternalServerError, Json(response));
