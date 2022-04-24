@@ -7,22 +7,22 @@ pub async fn check_price(mint_address: &str) -> Result<i32> {
     let rpc: RpcClient = RpcClient::new("https://solport.genesysgo.net/");
     let metadata = match verify_metadata(&rpc, mint_address) {
         Ok(metadata) => metadata,
-        Err(_e) => return Err(anyhow!("Failed to fetch metadata"))
+        Err(e) => return Err(anyhow!(e))
     };
 
     let inner = match fetch_inner_metadata(metadata, mint_address).await {
         Ok(inner) => inner,
-        Err(_e) => return Err(anyhow!("Failed to fetch uri metadata"))
+        Err(e) => return Err(anyhow!(e))
     };
 
     let rank = get_rank_attribute(inner.attributes)?;
 
     let price: i32 = match rank.value.as_str() {
-        "Academy" => 50,
-        "Genin" => 100,
-        "Chuunin" => 150,
-        "Jounin" => 200,
-        "Special Jonin" => 300,
+        "Academy" => 250,
+        "Genin" => 200,
+        "Chuunin" => 180,
+        "Jounin" => 180,
+        "Special Jonin" => 180,
         _ => return Err(anyhow!("Not a valid rank to use for rankup")),
     };
 
