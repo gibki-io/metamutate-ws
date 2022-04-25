@@ -221,10 +221,10 @@ async fn new_task(
     };
 
     // -- Query tasks for existing successful rankups
-    let fetch_task = Tasks::find()
-        .filter(entity::tasks::Column::MintAddress.contains(request.mint_address))
-        .filter(entity::tasks::Column::Success.contains("true"))
-        .order_by_desc(entity::tasks::Column::CreatedAt)
+    let fetch_task = History::find()
+        .filter(entity::history::Column::MintAddress.contains(request.mint_address))
+        .filter(entity::history::Column::Success.contains("true"))
+        .order_by_desc(entity::history::Column::FinishedAt)
         .one(db)
         .await;
 
@@ -248,9 +248,9 @@ async fn new_task(
     };
 
     // -- Check existing successful rankups if past cooldown period
-    let _found_task = if let Some(existing_task) = query_task {
+    let _found_task = if let Some(history) = query_task {
         let cooldown = 12;
-        let time_difference = task.created_at.as_ref().time() - existing_task.created_at.time();
+        let time_difference = task.created_at.as_ref().time() - history.finished_at.time();
         if time_difference.num_hours() < cooldown {
             let data = json!({ "error": "NFT is in rankup cooldown" });
             let response = SysResponse { data };
