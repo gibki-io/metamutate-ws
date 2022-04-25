@@ -22,11 +22,6 @@ pub async fn handle_update(mint_account: &'_ str) -> AnyResult<bool>{
         solana_sdk::commitment_config::CommitmentConfig::confirmed()
     );
 
-    let rpc2 = RpcClient::new_with_commitment(
-        "https://solport.genesysgo.net/", 
-        solana_sdk::commitment_config::CommitmentConfig::confirmed()
-    );
-
     let mint_verify = mint_account.to_owned().clone();
     let mint_upload = mint_account.to_owned().clone();
 
@@ -77,7 +72,7 @@ pub async fn handle_update(mint_account: &'_ str) -> AnyResult<bool>{
 
     let mpl_uri = format!("https://{}.ipfs.nftstorage.link", cid);
 
-    task::spawn_blocking(move || update_uri(&rpc2, &keypair, &mint_upload, mpl_uri.as_str())).await??;
+    task::spawn_blocking(move || update_uri(&rpc, &keypair, &mint_upload, mpl_uri.as_str())).await??;
     
     Ok(successful)
 }
