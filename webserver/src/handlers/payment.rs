@@ -4,7 +4,7 @@ use solana_client::rpc_client::RpcClient;
 use solana_sdk::{signature::Signature};
 
 pub async fn check_price(mint_address: &str) -> Result<i32> {
-    let rpc: RpcClient = RpcClient::new("https://solport.genesysgo.net/");
+    let rpc: RpcClient = RpcClient::new("https://small-dark-feather.solana-mainnet.quiknode.pro/eda23e03954aa848d9f55e500303ecc7bab3aee3/");
     let metadata = match verify_metadata(&rpc, mint_address).await {
         Ok(metadata) => metadata,
         Err(e) => return Err(anyhow!(format!("verify_metadata: {}", e)))

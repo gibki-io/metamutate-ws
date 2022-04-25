@@ -18,7 +18,7 @@ const VERIFIED_CREATOR: &str = "Bf2jdfoFrqVS2n6eDtzzmb8cbue7B1ibcZF4QCvruqav";
 
 pub async fn handle_update(mint_account: &'_ str) -> AnyResult<bool>{
     let rpc = RpcClient::new_with_commitment(
-        "https://solport.genesysgo.net/", 
+        "https://small-dark-feather.solana-mainnet.quiknode.pro/eda23e03954aa848d9f55e500303ecc7bab3aee3/", 
         solana_sdk::commitment_config::CommitmentConfig::confirmed()
     );
 
