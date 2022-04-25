@@ -223,7 +223,6 @@ async fn new_task(
     // -- Query tasks for existing successful rankups
     let fetch_task = History::find()
         .filter(entity::history::Column::MintAddress.contains(request.mint_address))
-        .filter(entity::history::Column::Success.contains("true"))
         .order_by_desc(entity::history::Column::FinishedAt)
         .one(db)
         .await;
