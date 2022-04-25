@@ -114,13 +114,13 @@ pub async fn rank_up(attributes: Vec<MetadataAttribute>) -> AnyResult<(Vec<Metad
         _ => return Err(anyhow!("Not a valid rank to use for rankup")),
     };
 
-    let successful = if chance >= denominator {
+    let successful = if chance > denominator {
         true
     } else {
         false
     };
 
-    let new_rank = if chance >= denominator {
+    let new_rank = if chance > denominator {
         match current_rank {
             "Academy" => "Genin",
             "Genin" => "Chuunin",

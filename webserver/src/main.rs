@@ -224,6 +224,7 @@ async fn new_task(
     let fetch_task = Tasks::find()
         .filter(entity::tasks::Column::MintAddress.contains(request.mint_address))
         .filter(entity::tasks::Column::Success.contains("true"))
+        .order_by_desc(entity::tasks::Column::CreatedAt)
         .one(db)
         .await;
 
@@ -250,7 +251,7 @@ async fn new_task(
     let _found_task = if let Some(existing_task) = query_task {
         let cooldown = 12;
         let time_difference = task.created_at.as_ref().time() - existing_task.created_at.time();
-        if time_difference.num_hours() > cooldown {
+        if time_difference.num_hours() < cooldown {
             let data = json!({ "error": "NFT is in rankup cooldown" });
             let response = SysResponse { data };
 
