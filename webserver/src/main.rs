@@ -433,7 +433,8 @@ async fn list_tasks(
     let fetch = Tasks::find()
         .filter(entity::tasks::Column::Account.contains(account))
         .order_by_desc(entity::tasks::Column::Id)
-        .all(db)
+        .paginate(db, 10)
+        .fetch()
         .await;
 
     let tasks = match fetch {
@@ -501,7 +502,8 @@ async fn list_payments(
     let fetch_payments = Payments::find()
         .filter(entity::payments::Column::Account.contains(account))
         .order_by_desc(entity::payments::Column::Id)
-        .all(db)
+        .paginate(db, 10)
+        .fetch()
         .await;
 
     let payments = match fetch_payments {
@@ -531,7 +533,8 @@ async fn list_history(
     let fetch_history = History::find()
         .filter(entity::history::Column::Account.contains(account))
         .order_by_desc(entity::history::Column::Id)
-        .all(db)
+        .paginate(db, 10)
+        .fetch()
         .await;
 
     let history = match fetch_history {
