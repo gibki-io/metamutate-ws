@@ -599,7 +599,7 @@ async fn receive_payment(
     // Verify Transaction Signature
     let _signature = solana_sdk::signature::Signature::new(&sig_bytes);
 
-    let fetch_task_by_id = Tasks::find_by_id(payment.id).one(db).await;
+    let fetch_task_by_id = Tasks::find_by_id(payment.task_id).one(db).await;
 
     let task: TasksModel = {
         let fetch_task = match fetch_task_by_id {
