@@ -124,7 +124,7 @@ pub async fn rank_up(attributes: Vec<MetadataAttribute>) -> AnyResult<(Vec<Metad
         match current_rank {
             "Academy" => "Genin",
             "Genin" => "Chuunin",
-            "Chuunin" => "Jonin",
+            "Chuunin" => "Jounin",
             "Jounin" => "Special Jounin",
             "Special Jounin" => "Kage",
             "Kage" => "Kage",
