@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use chrono::Utc;
 use handlers::metadata::handle_update;
 use migration::MigratorTrait;
@@ -591,19 +589,6 @@ async fn receive_payment(
             }
         }
     };
-
-    let sig_bytes = match bs58::decode(request.tx_id).into_vec() {
-        Ok(bytes) => bytes,
-        Err(_) => {
-            let data = json!({ "error": "Invalid signature" });
-            let response = SysResponse { data };
-
-            return (Status::BadRequest, Json(response));
-        }
-    };
-
-    // Verify Transaction Signature
-    let _signature = solana_sdk::signature::Signature::new(&sig_bytes);
 
     let fetch_task_by_id = Tasks::find_by_id(payment.task_id).one(db).await;
 

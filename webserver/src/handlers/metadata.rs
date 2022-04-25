@@ -6,20 +6,25 @@ use crate::{
 use anyhow::{anyhow, Result as AnyResult};
 use mpl_token_metadata::state::Metadata;
 use rand::Rng;
-use reqwest::blocking::multipart;
+
 use serde_json::{json, value::to_value, Value};
 use solana_client::rpc_client::RpcClient;
-use solana_sdk::signature::Keypair;
-use std::fs::File;
+use solana_sdk::{signature::Keypair, commitment_config::CommitmentConfig};
+use std::{fs::File, time::Duration};
 use metaboss::update_metadata::update_uri;
 use tokio::task;
 
 const VERIFIED_CREATOR: &str = "Bf2jdfoFrqVS2n6eDtzzmb8cbue7B1ibcZF4QCvruqav";
 
 pub async fn handle_update(mint_account: &'_ str) -> AnyResult<bool>{
-    let rpc = RpcClient::new_with_commitment(
-        "https://small-dark-feather.solana-mainnet.quiknode.pro/eda23e03954aa848d9f55e500303ecc7bab3aee3/", 
-        solana_sdk::commitment_config::CommitmentConfig::confirmed()
+
+    let url = "https://small-dark-feather.solana-mainnet.quiknode.pro/eda23e03954aa848d9f55e500303ecc7bab3aee3/".to_string();
+    let timeout = Duration::from_secs(120);
+    let commitment_config = CommitmentConfig::processed();
+    let rpc = RpcClient::new_with_timeout_and_commitment(
+        url,
+        timeout,
+        commitment_config,
     );
 
     let mint_verify = mint_account.to_owned().clone();
@@ -27,6 +32,7 @@ pub async fn handle_update(mint_account: &'_ str) -> AnyResult<bool>{
 
     let metadata = verify_metadata(&rpc, &mint_verify).await?;
     let mut inner = fetch_inner_metadata(metadata, mint_account).await?;
+    
     let rankup_result = rank_up(inner.attributes).await?;
     let (new_attributes, successful) = match rankup_result {
         (attributes, successful) => (attributes, successful)
@@ -60,8 +66,8 @@ pub async fn handle_update(mint_account: &'_ str) -> AnyResult<bool>{
 
     // Upload Metadata to Metaplex
     let raw_keys = tokio::fs::read("./keys/kamakura.json").await?;
-    let b58_keys = String::from_utf8_lossy(&raw_keys);
-    let keys = bs58::decode(b58_keys.as_ref()).into_vec()?;
+    let b58_keys = String::from_utf8(raw_keys)?;
+    let keys = bs58::decode(b58_keys).into_vec()?;
 
     let keypair = match Keypair::from_bytes(&keys) {
         Ok(keypair) => keypair,

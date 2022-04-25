@@ -1,10 +1,20 @@
+use std::time::Duration;
+
 use super::metadata::{get_rank_attribute, verify_metadata, fetch_inner_metadata};
 use anyhow::{anyhow, Result};
 use solana_client::rpc_client::RpcClient;
-use solana_sdk::{signature::Signature};
+use solana_sdk::{commitment_config::CommitmentConfig};
 
 pub async fn check_price(mint_address: &str) -> Result<i32> {
-    let rpc: RpcClient = RpcClient::new("https://small-dark-feather.solana-mainnet.quiknode.pro/eda23e03954aa848d9f55e500303ecc7bab3aee3/");
+    let url = "https://small-dark-feather.solana-mainnet.quiknode.pro/eda23e03954aa848d9f55e500303ecc7bab3aee3/".to_string();
+    let timeout = Duration::from_secs(120);
+    let commitment_config = CommitmentConfig::processed();
+    let rpc = RpcClient::new_with_timeout_and_commitment(
+        url,
+        timeout,
+        commitment_config,
+    );
+    
     let metadata = match verify_metadata(&rpc, mint_address).await {
         Ok(metadata) => metadata,
         Err(e) => return Err(anyhow!(format!("verify_metadata: {}", e)))
