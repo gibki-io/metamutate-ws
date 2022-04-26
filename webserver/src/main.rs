@@ -250,7 +250,7 @@ async fn new_task(
     // -- Check existing successful rankups if past cooldown period
     let _found_task = if let Some(history) = query_task {
         let cooldown = 12;
-        let time_difference = time_now.time() - history.finished_at.time();
+        let time_difference = time_now - history.finished_at;
         if time_difference.num_hours() < cooldown {
             let data = json!({ "error": "NFT is in rankup cooldown" });
             let response = SysResponse { data };
