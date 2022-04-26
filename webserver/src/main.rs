@@ -246,16 +246,16 @@ async fn new_task(
     };
 
     // -- Check existing successful rankups if past cooldown period
-    let _found_task = if let Some(history) = query_task {
-        let cooldown = 12;
-        let time_difference = task.created_at.as_ref().time() - history.finished_at.time();
-        if time_difference.num_hours() < cooldown {
-            let data = json!({ "error": "NFT is in rankup cooldown" });
-            let response = SysResponse { data };
-
-            return (Status::BadRequest, Json(response));
-        }
-    };
+    ///let _found_task = if let Some(history) = query_task {
+        //let cooldown = 12;
+        //let time_difference = task.created_at.as_ref().time() - history.finished_at.time();
+        //if time_difference.num_hours() < cooldown {
+        //    let data = json!({ "error": "NFT is in rankup cooldown" });
+        //    let response = SysResponse { data };
+        //
+        //    return (Status::BadRequest, Json(response));
+        //}
+    //};
 
     // -- Save Task
     match task.save(db).await {
