@@ -236,26 +236,28 @@ async fn new_task(
         }
     };
 
+    let time_now = Utc::now().naive_utc();
+
     let task = entity::tasks::ActiveModel {
         id: NotSet,
         account: Set(request.account.to_string()),
         mint_address: Set(request.mint_address.to_string()),
         success: Set(false),
-        created_at: Set(Utc::now().naive_utc()),
+        created_at: Set(time_now),
         price: Set(price),
     };
 
     // -- Check existing successful rankups if past cooldown period
-    ///let _found_task = if let Some(history) = query_task {
-        //let cooldown = 12;
-        //let time_difference = task.created_at.as_ref().time() - history.finished_at.time();
-        //if time_difference.num_hours() < cooldown {
-        //    let data = json!({ "error": "NFT is in rankup cooldown" });
-        //    let response = SysResponse { data };
-        //
-        //    return (Status::BadRequest, Json(response));
-        //}
-    //};
+    let _found_task = if let Some(history) = query_task {
+        let cooldown = 12;
+        let time_difference = time_now.time() - history.finished_at.time();
+        if time_difference.num_hours() < cooldown {
+            let data = json!({ "error": "NFT is in rankup cooldown" });
+            let response = SysResponse { data };
+        
+            return (Status::BadRequest, Json(response));
+        }
+    };
 
     // -- Save Task
     match task.save(db).await {
