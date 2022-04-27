@@ -20,7 +20,6 @@ use util::{
 use entity::accounts::Entity as Accounts;
 use entity::history::Entity as History;
 use entity::payments::Entity as Payments;
-pub use entity::prelude::*;
 use entity::tasks::Entity as Tasks;
 
 use sea_orm::entity::prelude::Uuid;
@@ -31,6 +30,8 @@ use sea_orm_rocket::{Connection, Database};
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::Header;
 use rocket::Response;
+
+use solana_sdk::signature::Signature;
 
 pub struct CORS;
 
@@ -254,7 +255,7 @@ async fn new_task(
         if time_difference.num_hours() < cooldown {
             let data = json!({ "error": "NFT is in rankup cooldown" });
             let response = SysResponse { data };
-        
+
             return (Status::BadRequest, Json(response));
         }
     };
@@ -302,6 +303,61 @@ async fn new_task(
     let response = SysResponse { data };
 
     (Status::Created, Json(response))
+}
+
+#[post("/tasks/delete/id/<task_id>")]
+async fn delete_task(
+    task_id: i32,
+    connection: Connection<'_, Db>,
+    _auth: ApiKey<'_>,
+) -> WebResponse {
+    let db = connection.into_inner();
+
+    let result = Tasks::delete_by_id(task_id).exec(db).await;
+
+    match result {
+        Ok(_) => {
+            let data = json!({ "message": "Task has been deleted" });
+            let response = SysResponse { data };
+
+            (Status::Accepted, Json(response))
+        }
+        Err(_) => {
+            let data = json!({ "message": "Failed to delete task" });
+            let response = SysResponse { data };
+
+            (Status::InternalServerError, Json(response))
+        }
+    }
+}
+
+#[post("/tasks/delete/account/<account>")]
+async fn delete_tasks_account(
+    account: &str,
+    connection: Connection<'_, Db>,
+    _auth: ApiKey<'_>,
+) -> WebResponse {
+    let db = connection.into_inner();
+
+    let result = Tasks::delete_many()
+        .filter(entity::tasks::Column::Account.contains(account))
+        .exec(db)
+        .await;
+
+    match result {
+        Ok(_) => {
+            let data = json!({ "message": "tasks deleted" });
+            let response = SysResponse { data };
+
+            (Status::Accepted, Json(response))
+        }
+        Err(_) => {
+            let data = json!({ "message": "Failed to delete tasks" });
+            let response = SysResponse { data };
+
+            (Status::InternalServerError, Json(response))
+        }
+    }
 }
 
 #[post("/payments", data = "<payment_request>")]
@@ -566,6 +622,21 @@ async fn receive_payment(
     let request = payment_receive.into_inner();
     let db = connection.into_inner();
 
+    let signature = request.tx_id;
+    let b58 = bs58::decode(signature).into_vec();
+
+    let signature = match b58 {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            let data = json!({ "error": "Failed to decode signature" });
+            let response = SysResponse { data };
+
+            return (Status::InternalServerError, Json(response));
+        }
+    };
+
+    let _signature = Signature::new(&signature);
+
     let fetch_payment_by_id: Result<Option<PaymentsModel>, sea_orm::DbErr> = Payments::find()
         .filter(entity::payments::Column::Id.eq(request.payment_id))
         .one(db)
@@ -617,7 +688,31 @@ async fn receive_payment(
         }
     };
 
-    let success = match handle_update(&task.mint_address).await {
+    let mint_address = task.mint_address.to_owned();
+
+    let new_history = entity::history::ActiveModel {
+        id: NotSet,
+        account: Set(payment.account),
+        mint_address: Set(mint_address.clone()),
+        finished_at: Set(Utc::now().naive_utc()),
+        payment_id: Set(payment.id),
+        task_id: Set(task.id),
+        signature: Set(request.tx_id.to_string()),
+        price: Set(task.price),
+        success: Set(false),
+    };
+
+    let mut new_history = match new_history.save(db).await {
+        Ok(history) => history,
+        Err(e) => {
+            let data = json!({ "error": e.to_string() });
+            let response = SysResponse { data };
+
+            return (Status::InternalServerError, Json(response));
+        }
+    };
+
+    let success = match handle_update(&mint_address).await {
         Ok(val) => val,
         Err(e) => {
             let data = json!({ "error": e.to_string() });
@@ -627,17 +722,7 @@ async fn receive_payment(
         }
     };
 
-    let new_history = entity::history::ActiveModel {
-        id: NotSet,
-        account: Set(payment.account),
-        mint_address: Set(task.mint_address),
-        finished_at: Set(Utc::now().naive_utc()),
-        payment_id: Set(payment.id),
-        task_id: Set(task.id),
-        signature: Set(request.tx_id.to_string()),
-        price: Set(task.price),
-        success: Set(success),
-    };
+    new_history.success = Set(success);
 
     match new_history.save(db).await {
         Ok(_) => (),
@@ -645,7 +730,7 @@ async fn receive_payment(
             let data = json!({ "error": e.to_string() });
             let response = SysResponse { data };
 
-            return (Status::InternalServerError, Json(response))
+            return (Status::InternalServerError, Json(response));
         }
     }
 
@@ -707,6 +792,8 @@ async fn rocket() -> _ {
                 list_tasks,
                 list_payments,
                 list_history,
+                delete_task,
+                delete_tasks_account,
                 receive_payment
             ],
         )
