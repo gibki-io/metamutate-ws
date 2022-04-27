@@ -320,7 +320,7 @@ async fn delete_task(
             let data = json!({ "message": "Task has been deleted" });
             let response = SysResponse { data };
 
-            (Status::Accepted, Json(response))
+            (Status::Ok, Json(response))
         }
         Err(_) => {
             let data = json!({ "message": "Failed to delete task" });
@@ -349,7 +349,7 @@ async fn delete_tasks_account(
             let data = json!({ "message": "tasks deleted" });
             let response = SysResponse { data };
 
-            (Status::Accepted, Json(response))
+            (Status::Ok, Json(response))
         }
         Err(_) => {
             let data = json!({ "message": "Failed to delete tasks" });
