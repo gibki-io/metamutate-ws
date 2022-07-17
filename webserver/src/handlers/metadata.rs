@@ -11,7 +11,7 @@ use serde_json::{json, value::to_value, Value};
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{signature::Keypair, commitment_config::CommitmentConfig};
 use std::{fs::File, time::Duration};
-use metaboss::update_metadata::update_uri;
+use metaboss::update::uri::update_uri;
 use tokio::task;
 
 const VERIFIED_CREATOR: &str = "Bf2jdfoFrqVS2n6eDtzzmb8cbue7B1ibcZF4QCvruqav";

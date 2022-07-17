@@ -26,13 +26,13 @@ reqwest = { version = "0.11", features = ["json", "multipart"] }
 tokio = { version = "1", features = ["full"] }
 
 # Metadata
-metaboss = "0.6.0"
+metaboss = "0.8.0"
 rand = "0.8.5"
 retry = "1.3.1"
-solana-program = "1.10.8"
-solana-client = "1.10.8"
-solana-sdk = "1.10.8"
-mpl-token-metadata = "1.2.5"
+solana-program = "1"
+solana-client = "1"
+solana-sdk = "1"
+mpl-token-metadata = "1"
 
 # Time
 chrono = "0.4"
