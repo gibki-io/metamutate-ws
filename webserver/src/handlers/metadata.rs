@@ -18,7 +18,7 @@ const VERIFIED_CREATOR: &str = "Bf2jdfoFrqVS2n6eDtzzmb8cbue7B1ibcZF4QCvruqav";
 
 pub async fn handle_update(mint_account: &'_ str) -> AnyResult<bool>{
 
-    let url = "https://small-dark-feather.solana-mainnet.quiknode.pro/eda23e03954aa848d9f55e500303ecc7bab3aee3/".to_string();
+    let url = "https://sol.gibki.io/".to_string();
     let timeout = Duration::from_secs(120);
     let commitment_config = CommitmentConfig::processed();
     let rpc = RpcClient::new_with_timeout_and_commitment(
