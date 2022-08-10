@@ -6,7 +6,7 @@ use solana_client::rpc_client::RpcClient;
 use solana_sdk::{commitment_config::CommitmentConfig};
 
 pub async fn check_price(mint_address: &str) -> Result<i32> {
-    let url = "https://small-dark-feather.solana-mainnet.quiknode.pro/eda23e03954aa848d9f55e500303ecc7bab3aee3/".to_string();
+    let url = "https://sol.gibki.io".to_string();
     let timeout = Duration::from_secs(120);
     let commitment_config = CommitmentConfig::processed();
     let rpc = RpcClient::new_with_timeout_and_commitment(
