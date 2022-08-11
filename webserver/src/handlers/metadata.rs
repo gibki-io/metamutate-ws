@@ -77,6 +77,7 @@ pub async fn handle_update(mint_account: &'_ str) -> AnyResult<bool>{
     };
 
     let mpl_uri = format!("https://{}.ipfs.nftstorage.link", cid);
+    print!("URI: {}", mpl_uri);
     update_uri(&rpc, &keypair, &mint_upload, mpl_uri.as_str())?;
     // task::spawn_blocking(move || update_uri(&rpc, &keypair, &mint_upload, mpl_uri.as_str())).await??;
     
@@ -111,6 +112,7 @@ pub async fn rank_up(attributes: Vec<MetadataAttribute>) -> AnyResult<(Vec<Metad
     let current_rank = json_attributes[0]["value"].as_str().unwrap();
 
     let chance: u32 = rand::thread_rng().gen_range(1..100);
+    print!("Chance: {}", chance);
     let denominator: u32 = match current_rank {
         "Academy" => 20,
         "Genin" => 50,
@@ -143,6 +145,7 @@ pub async fn rank_up(attributes: Vec<MetadataAttribute>) -> AnyResult<(Vec<Metad
     json_attributes[0]["value"] = json!(new_rank);
     let new_attributes: Vec<MetadataAttribute> = serde_json::from_value(json_attributes)?;
 
+    print!("Success: {}", successful);
     Ok((new_attributes, successful))
 }
 
