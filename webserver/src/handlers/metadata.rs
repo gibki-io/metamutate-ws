@@ -77,8 +77,8 @@ pub async fn handle_update(mint_account: &'_ str) -> AnyResult<bool>{
     };
 
     let mpl_uri = format!("https://{}.ipfs.nftstorage.link", cid);
-
-    task::spawn_blocking(move || update_uri(&rpc, &keypair, &mint_upload, mpl_uri.as_str())).await??;
+    update_uri(&rpc, &keypair, &mint_upload, mpl_uri.as_str())?;
+    // task::spawn_blocking(move || update_uri(&rpc, &keypair, &mint_upload, mpl_uri.as_str())).await??;
     
     Ok(successful)
 }
