@@ -31,8 +31,8 @@ pub async fn check_price(mint_address: &str) -> Result<i32> {
         "Academy" => 250,
         "Genin" => 200,
         "Chuunin" => 180,
-        "Jounin" => 180,
-        "Special Jounin" => 180,
+        "Jounin" => 360,
+        "Special Jounin" => 500,
         _ => return Err(anyhow!("Not a valid rank to use for rankup")),
     };
 

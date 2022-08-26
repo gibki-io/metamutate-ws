@@ -118,7 +118,7 @@ pub async fn rank_up(attributes: Vec<MetadataAttribute>) -> AnyResult<(Vec<Metad
         "Genin" => 50,
         "Chuunin" => 70,
         "Jounin" => 85,
-        "Special Jounin" => 95,
+        "Special Jounin" => 96,
         _ => return Err(anyhow!("Not a valid rank to use for rankup")),
     };
 
